@@ -218,3 +218,39 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ==========================================
+# PaliDerm - Project-specific exclusions
+# ==========================================
+
+# Environment variables and secrets
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# Local SQLite databases and runtime files
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
+
+# Uploaded patient images and clinical files
+uploads/
+media/
+patient_images/
+
+# Local application data
+data/local/
+storage/
+
+# macOS
+.DS_Store
+
+# IDE-specific local configuration
+.idea/
+
+AGENTS.md
+implementation.md
+AI TELEDERMATOLOGY & SKIN INTELLIGENCE PLATFORM.pdf
