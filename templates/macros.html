@@ -1,0 +1,3 @@
+{% macro token() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
+{% macro text(key, value='', required=false, type='text') %}<label>{{ t(key) }}<input type="{{ type }}" name="{{ key }}" value="{{ value or '' }}" dir="{{ 'ltr' if type in ['email','tel','date','number'] else 'auto' }}" {% if required %}required{% endif %}></label>{% endmacro %}
+{% macro patient_details(p) %}<h2>{{ t('profile') }}</h2><dl>{% for key in ['first_name','last_name','date_of_birth','sex','phone','email'] %}<dt>{{ t(key) }}</dt><dd dir="{{ 'ltr' if key in ['phone','email','date_of_birth'] else 'auto' }}">{{ p[key] or t('unknown') }}</dd>{% endfor %}</dl>{% endmacro %}

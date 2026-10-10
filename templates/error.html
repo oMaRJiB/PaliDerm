@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<h2>{{ t('error') }}</h2><p role="alert">{{ t(error_key) }}</p><button type="button" id="return-to-form">{{ t('return') }}</button> <a href="{{ url_for('home') }}">{{ t('home') }}</a>{% endblock %}

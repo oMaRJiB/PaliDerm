@@ -1,0 +1,45 @@
+{% extends 'base.html' %}{% from 'macros.html' import token,text,patient_details with context %}{% block content %}
+<h2>{{ t('case') }} {{ case.case_id }}</h2><p>{{ t('status') }}: {{ t(case.status) }}</p>
+{{ patient_details(patient) }}
+{% if case.status == 'draft' and identity.role == 'patient' %}
+<form method="post" action="{{ url_for('save_draft',case_id=case.case_id) }}">{{ token() }}
+{{ text('chief_complaint',case.chief_complaint,true) }}{{ text('duration_days',case.duration_days if case.duration_days is not none else '',type='number') }}
+<fieldset><legend>{{ t('symptoms') }}</legend>{% for k in symptom_keys %}<label>{{ t(k) }}<select name="{{ k }}">{% for v,key in [('', 'unknown'),('0','no'),('1','yes')] %}<option value="{{ v }}" {% if symptom and (symptom[k]|string if symptom[k] is not none else '') == v %}selected{% endif %}>{{ t(key) }}</option>{% endfor %}</select></label>{% endfor %}
+<label>{{ t('additional_notes') }}<textarea name="additional_notes" dir="auto">{{ symptom.additional_notes or '' if symptom else '' }}</textarea></label></fieldset>
+<fieldset><legend>{{ t('body_sites') }}</legend>{% for s in sites %}<label><input type="checkbox" name="body_sites" value="{{ s.body_site_id }}" {% if s.body_site_id in selected_sites %}checked{% endif %}>{{ t(s.site_name) }}</label>{% endfor %}</fieldset>
+<button>{{ t('save_draft') }}</button></form>
+{% if lesions %}<h3>{{ t('upload') }}</h3><p>{{ image_help }}</p>
+<form method="post" enctype="multipart/form-data" action="{{ url_for('upload',case_id=case.case_id) }}">{{ token() }}<label>{{ t('body_site') }}<select name="lesion_id">{% for l in lesions %}<option value="{{ l.lesion_id }}">{{ t(l.site_name) }}</option>{% endfor %}</select></label><label>{{ t('images') }}<input type="file" name="images" accept="image/jpeg,image/png" multiple required></label><button>{{ t('upload') }}</button></form>{% endif %}
+<form method="post" action="{{ url_for('submit',case_id=case.case_id) }}">{{ token() }}<label><input type="checkbox" name="consent" value="1" required>{{ t('consent') }}</label><button>{{ t('submit') }}</button></form>
+{% else %}
+<dl><dt>{{ t('chief_complaint') }}</dt><dd dir="auto">{{ case.chief_complaint }}</dd><dt>{{ t('duration_days') }}</dt><dd>{{ case.duration_days if case.duration_days is not none else t('unknown') }}</dd><dt>{{ t('submitted_at') }}</dt><dd dir="ltr">{{ case.submitted_at }}</dd><dt>{{ t('consent_record') }}</dt><dd dir="ltr">{{ case.consent_at }} / {{ case.consent_version }}</dd></dl>
+<h3>{{ t('symptoms') }}</h3><dl>{% for k in symptom_keys %}<dt>{{ t(k) }}</dt><dd>{{ t('unknown') if not symptom or symptom[k] is none else t('yes' if symptom[k] else 'no') }}</dd>{% endfor %}<dt>{{ t('additional_notes') }}</dt><dd dir="auto">{{ symptom.additional_notes or t('empty') if symptom else t('empty') }}</dd></dl>
+<h3>{{ t('body_sites') }}</h3><ul>{% for l in lesions %}<li>{{ t(l.site_name) }}</li>{% endfor %}</ul>
+{% endif %}
+<h3>{{ t('images') }}</h3>{% for i in images %}<figure><a href="{{ url_for('image',image_id=i.image_id) }}"><img src="{{ url_for('image',image_id=i.image_id) }}" alt="{{ t('image') }} {{ i.image_id }}: {{ t(i.site_name) }}"></a><figcaption>{{ t(i.site_name) }} — {{ t('image_quality') }}: {{ t(i.image_quality) }}</figcaption></figure>{% else %}<p>{{ t('empty') }}</p>{% endfor %}
+{% if case.status == 'needs_information' %}<p>{{ t('resubmit_blocked') }}</p>{% endif %}
+<h2>{{ t('released') }}</h2>
+{% if latest %}
+<dl><dt>{{ t('decision') }}</dt><dd>{{ t(latest.decision) }}</dd><dt>{{ t('triage_level') }}</dt><dd>{{ t(latest.triage_level) }}</dd><dt>{{ t('patient_message') }}</dt><dd dir="auto">{{ latest.patient_message }}</dd><dt>{{ t('reviewed_at') }}</dt><dd dir="ltr">{{ latest.reviewed_at }}</dd><dt>{{ t('provider') }}</dt><dd dir="auto">{{ latest.name }}</dd></dl>
+<h3>{{ t('diagnoses') }}</h3><ul>{% for d in diagnoses %}<li><span dir="auto">{{ d.diagnosis_name }}</span> — {{ t(d.certainty) }}{% if d.is_primary %} ({{ t('primary') }}){% endif %}</li>{% else %}<li>{{ t('empty') }}</li>{% endfor %}</ul>
+<h3>{{ t('treatments') }}</h3>{% for tr in treatments %}<dl><dt>{{ t('diagnosis_name') }}</dt><dd dir="auto">{{ tr.diagnosis_name }}</dd>{% for key in ['medication','dosage','instructions'] %}<dt>{{ t(key) }}</dt><dd dir="auto">{{ tr[key] or t('empty') }}</dd>{% endfor %}</dl>{% else %}<p>{{ t('empty') }}</p>{% endfor %}
+{% if latest.referral_required %}<dl>{% for key in ['referral_destination','referral_reason'] %}<dt>{{ t(key) }}</dt><dd dir="auto">{{ latest[key] }}</dd>{% endfor %}</dl>{% endif %}<p>{{ t('followup_date') }}: <bdi dir="ltr">{{ latest.followup_date or t('empty') }}</bdi></p>
+{% else %}<p>{{ t('no_result') }}</p>{% endif %}
+{% if identity.role == 'provider' %}
+<h2>{{ t('ai') }}</h2><p>{{ t('ai_configured' if ai_configured else 'ai_pending') }}</p><p>{{ t('ai_disclaimer') }}</p><p>{{ t('quality_warning') }}</p>
+<form method="post" action="{{ url_for('analyze',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="analysis_base" value="{{ analyses[0].analysis_id if analyses else 0 }}"><button>{{ t('ai_request') }}</button></form>
+<h3>{{ t('ai_history') }}</h3><ul>{% for a in analyses %}<li><bdi dir="ltr">{{ a.analysis_id }} / {{ a.started_at }} / {{ a.model_name }}</bdi>: {{ t(a.status) }}{% if a.error_message %} — {{ t(a.error_message) }}{% endif %}</li>{% else %}<li>{{ t('no_analysis') }}</li>{% endfor %}</ul>
+{% if latest_success %}<h3>{{ t('latest_success') }}</h3><p dir="auto">{{ latest_success.summary }}</p><p>{{ t(latest_success.triage_level) }}</p><p dir="auto">{{ latest_success.rationale }}</p><p dir="auto">{{ latest_success.limitations }}</p><ol>{% for c in candidates %}<li dir="auto">{{ c.diagnosis_name }}{% if c.confidence is not none %} ({{ t('confidence') }}: {{ c.confidence }}){% endif %} {{ c.rationale or '' }}</li>{% endfor %}</ol>{% endif %}
+{% if case.status == 'submitted' %}<form method="post" action="{{ url_for('transition',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="action" value="claim"><button>{{ t('claim') }}</button></form>{% endif %}
+{% if case.status == 'reviewed' %}{% for action,key in [('revise','revision'),('close','close')] %}<form method="post" action="{{ url_for('transition',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="action" value="{{ action }}"><button>{{ t(key) }}</button></form>{% endfor %}{% endif %}
+{% if case.status == 'in_review' %}
+<h2>{{ t('review') }}</h2><form method="post" action="{{ url_for('review',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="review_base" value="{{ review_base }}">
+<label>{{ t('decision') }}<select name="decision">{% for v in decisions %}<option value="{{ v }}" {% if v == 'inconclusive' %}selected{% endif %}>{{ t(v) }}</option>{% endfor %}</select></label>
+<label>{{ t('triage_level') }}<select name="triage_level">{% for v in triage_options %}<option value="{{ v }}" {% if v == 'undetermined' %}selected{% endif %}>{{ t(v) }}</option>{% endfor %}</select></label>
+<label>{{ t('patient_message') }}<textarea name="patient_message" dir="auto" required></textarea></label><label>{{ t('clinical_notes') }}<textarea name="clinical_notes" dir="auto"></textarea></label>
+<fieldset><legend>{{ t('diagnoses') }}</legend>{% for n in range(3) %}<fieldset><legend>{{ t('diagnosis_name') }} {{ n+1 }}</legend><label>{{ t('diagnosis_name') }}<input name="diagnosis_{{ n }}" dir="auto"></label><label>{{ t('certainty') }}<select name="certainty_{{ n }}"><option value="provisional">{{ t('provisional') }}</option><option value="confirmed">{{ t('confirmed') }}</option></select></label><label><input type="radio" name="primary" value="{{ n }}" {% if n==0 %}checked{% endif %}>{{ t('primary') }}</label>{% for k in ['medication','dosage'] %}<label>{{ t(k) }}<input name="{{ k }}_{{ n }}" dir="auto"></label>{% endfor %}<label>{{ t('instructions') }}<textarea name="instructions_{{ n }}" dir="auto"></textarea></label></fieldset>{% endfor %}</fieldset>
+<label><input type="checkbox" name="referral_required" value="1">{{ t('referral_required') }}</label>{{ text('referral_destination') }}<label>{{ t('referral_reason') }}<textarea name="referral_reason" dir="auto"></textarea></label>{{ text('followup_date',type='date') }}<button>{{ t('review') }}</button></form>{% endif %}
+{% if latest %}<h3>{{ t('clinical_notes') }}</h3><p dir="auto">{{ latest.clinical_notes or t('empty') }}</p>{% endif %}
+<h3>{{ t('review_history') }}</h3>{% for r in reviews %}<details><summary>{{ r.review_id }} — {{ t(r.decision) }} — <bdi dir="ltr">{{ r.reviewed_at }}</bdi></summary><p dir="auto">{{ r.patient_message }}</p><p dir="auto">{{ r.clinical_notes or '' }}</p></details>{% endfor %}
+{% endif %}
+{% endblock %}

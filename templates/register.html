@@ -1,0 +1,2 @@
+{% extends 'base.html' %}{% from 'macros.html' import token, text with context %}{% block content %}
+<h2>{{ t('register') }}</h2><form method="post">{{ token() }}{{ text('first_name',required=true) }}{{ text('last_name',required=true) }}{{ text('date_of_birth',type='date') }}{{ text('sex') }}{{ text('phone',type='tel') }}{{ text('email',type='email') }}<button>{{ t('save') }}</button></form>{% endblock %}

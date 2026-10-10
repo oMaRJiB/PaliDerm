@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% from 'macros.html' import token with context %}{% block content %}
+<h2>{{ t('login') }}</h2><p>{{ t('demo_auth') }}</p>
+<form method="post">{{ token() }}<label>{{ t('identity') }}<select name="identity" required>
+{% for p in patients %}<option value="patient:{{ p.patient_id }}">{{ t('patient') }} {{ p.patient_id }}: {{ p.first_name }} {{ p.last_name }}</option>{% endfor %}
+{% for p in providers %}<option value="provider:{{ p.provider_id }}">{{ t('provider') }} {{ p.provider_id }}: {{ p.name }}</option>{% endfor %}
+<option value="worker-demo">{{ t('worker') }}</option></select></label><button>{{ t('login') }}</button></form>
+<a href="{{ url_for('register') }}">{{ t('register') }}</a>{% endblock %}

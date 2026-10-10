@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% from 'macros.html' import token,text,patient_details with context %}{% block content %}
+{{ patient_details(patient) }}<h2>{{ t('cases') }}</h2><ul>{% for c in cases %}<li><a href="{{ url_for('case_page',case_id=c.case_id) }}">{{ t('case') }} {{ c.case_id }}</a> — {{ t(c.status) }} <span dir="auto">{{ c.chief_complaint }}</span></li>{% else %}<li>{{ t('empty') }}</li>{% endfor %}</ul>
+<h2>{{ t('new_case') }}</h2><form method="post" action="{{ url_for('new_case',patient_id=patient.patient_id) }}">{{ token() }}{{ text('chief_complaint',required=true) }}{{ text('duration_days',type='number') }}<button>{{ t('new_case') }}</button></form>{% endblock %}
