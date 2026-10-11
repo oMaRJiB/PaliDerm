@@ -6,6 +6,7 @@ import math
 
 @dataclass(frozen=True)
 class ImageInput:
+    """Immutable source reference/hash/MIME for an encrypted image readable through ImageStorage."""
     image_id: int
     storage_reference: str
     sha256: str
@@ -15,6 +16,7 @@ class ImageInput:
 
 @dataclass(frozen=True)
 class LesionInput:
+    """Immutable affected-site grouping of source images."""
     lesion_id: int
     body_site: str
     images: tuple[ImageInput, ...]
@@ -22,6 +24,7 @@ class LesionInput:
 
 @dataclass(frozen=True)
 class AnalysisInput:
+    """Immutable typed clinical input; sex is canonical and symptom NULL values remain unknown."""
     contract_version: str
     case_id: int
     complaint: str
@@ -35,6 +38,7 @@ class AnalysisInput:
 
 @dataclass(frozen=True)
 class Candidate:
+    """Adapter-supplied unconfirmed suggestion; confidence may be absent."""
     diagnosis_name: str
     rank: int
     confidence: float | None = None
@@ -43,6 +47,7 @@ class Candidate:
 
 @dataclass(frozen=True)
 class AnalysisOutput:
+    """Typed adapter output validated before any clinical narrative is persisted."""
     model_name: str
     model_version: str
     prompt_version: str
@@ -54,6 +59,7 @@ class AnalysisOutput:
     image_quality: dict[int, str] = field(default_factory=dict)
 
     def validate(self, request: AnalysisInput):
+        """Reject malformed output and cross-case image references; never infer clinical thresholds."""
         for value in (self.model_name, self.model_version, self.prompt_version,
                       self.summary, self.rationale, self.limitations):
             if not isinstance(value, str) or not value.strip():
@@ -79,18 +85,24 @@ class AnalysisOutput:
 
 
 class Adapter(Protocol):
+    """Replaceable inference contract owned by Omar; storage encryption does not change its signature."""
     model_name: str
     model_version: str
     prompt_version: str
-    def analyze_case(self, input: AnalysisInput) -> AnalysisOutput: ...
+    def analyze_case(self, input: AnalysisInput) -> AnalysisOutput:
+        """Raise AIUnavailable rather than creating an inference attempt or synthetic result."""
+        ...
 
 
 class AIUnavailable(Exception):
+    """Signal an intentionally unconfigured inference boundary, independent of clinician review."""
     pass
 
 
 class UnconfiguredAdapter:
+    """Default boundary that never produces fabricated analysis or diagnoses."""
     def analyze_case(self, input: AnalysisInput) -> AnalysisOutput:
+        """Raise AIUnavailable rather than creating an inference attempt or synthetic result."""
         raise AIUnavailable('AI integration pending')
 
 

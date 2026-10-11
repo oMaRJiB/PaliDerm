@@ -1,3 +1,4 @@
+"""Storage/lifecycle contract tests using developer fixtures; no model inference."""
 import json
 import time
 import unittest
@@ -6,6 +7,7 @@ from test_workflow import WorkflowSupport
 from fixtures import FixtureAdapter
 from backend.ai.runner import recover_interrupted
 from backend.db import get_db
+from backend.security import cipher
 from backend import services as svc
 
 
@@ -20,7 +22,7 @@ class AIRunnerTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.scalar('SELECT count(*) FROM AICandidate'), 1)
         self.assertEqual(self.scalar('SELECT image_quality FROM LesionImage LIMIT 1'), 'poor')
         self.assertEqual(self.scalar('SELECT count(*) FROM Diagnosis'), 0)
-        snapshot = json.loads(self.scalar('SELECT input_snapshot_json FROM AIAnalysis'))
+        snapshot = json.loads(self.field('AIAnalysis', 'input_snapshot_json'))
         self.assertIsNone(snapshot['symptoms']['itching'])
         self.assertEqual(snapshot['lesions'][0]['images'][0]['quality'], 'unassessed')
         self.post(f'/cases/{cid}/analyze', {'analysis_base':'0'})
@@ -70,7 +72,7 @@ class AIRunnerTests(WorkflowSupport, unittest.TestCase):
         time.sleep(.06)  # allow test worker to exit; late results must not be committed
         self.assertEqual(self.scalar('SELECT count(*) FROM AICandidate'),0)
         with self.app.app_context(), svc.transaction() as db:
-            db.execute("INSERT INTO AIAnalysis(case_id,model_name,model_version,prompt_version,input_snapshot_json,status) VALUES(?,'fixture','1','not-applicable','{}','running')",(cid,))
+            db.execute("INSERT INTO AIAnalysis(case_id,model_name,model_version,prompt_version,input_snapshot_json,status) VALUES(?,'fixture','1','not-applicable',?,'running')",(cid,json.dumps({'encrypted':cipher().encrypt('{}','AIAnalysis.input_snapshot_json')})))
         recover_interrupted(self.config['DATABASE'])
         self.assertEqual(self.scalar('SELECT error_message FROM AIAnalysis ORDER BY analysis_id DESC LIMIT 1'),'interrupted')
         self.assertEqual(self.post(f'/cases/{cid}/transition',{'action':'claim'}).status_code,302)

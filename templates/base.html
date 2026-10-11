@@ -1,12 +1,22 @@
 <!doctype html>
 <html lang="{{ locale }}" dir="{{ direction }}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ t('app_title') }}</title>
-<style>body{font-family:system-ui,sans-serif;max-width:70rem;margin:1rem auto;padding:0 1rem}label{display:block;margin-block:.6rem}input,select,textarea,button{font:inherit;max-width:100%;box-sizing:border-box}textarea{width:100%;min-height:5rem}fieldset{margin-block:1rem}img{max-width:100%;height:auto;max-height:20rem}table{border-collapse:collapse}td,th{border:1px solid;padding:.4rem;text-align:start}nav{display:flex;gap:1rem;flex-wrap:wrap}p,dd{overflow-wrap:anywhere;white-space:pre-wrap}.scroll{overflow-x:auto}dt{font-weight:bold}dd{margin-inline-start:1rem}</style>
-</head><body>
-<header><h1>{{ t('app_title') }}</h1><p>{{ t('prototype') }}</p><p><strong>{{ t('emergency') }}</strong></p>
+<link rel="stylesheet" href="{{ url_for('static',filename='app.css') }}">
+</head><body data-working="{{ t('working') }}" data-network-error="{{ t('network_error') }}" data-remove="{{ t('remove_selection') }}" data-selected-preview="{{ t('selected_preview') }}" data-preview-unavailable="{{ t('preview_unavailable') }}">
+<a class="skip-link" href="#main">{{ t('skip_content') }}</a>
+<header><div class="header-inner"><h1>{{ t('app_title') }}</h1><p>{{ t('prototype') }}</p><p class="emergency"><strong>{{ t('emergency') }}</strong></p>
 {% if locale == 'ar' %}<p>{{ t('arabic_pending') }}</p>{% endif %}
-<nav><a href="{{ url_for('home') }}">{{ t('home') }}</a><a href="{{ url_for('login') }}">{{ t('login') }}</a>{% if identity %}<span dir="auto">{{ identity.name }} ({{ t(identity.role) }})</span><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>{{ t('logout') }}</button></form>{% endif %}</nav></header>
-{% for message in get_flashed_messages() %}<p role="status">{{ message }}</p>{% endfor %}
-<main>{% block content %}{% endblock %}</main>
+<nav aria-label="{{ t('navigation') }}">
+<a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>{{ t('home') }}</a>
+{% if identity %}
+{% if identity.role == 'patient' %}<a href="{{ url_for('my_cases') }}" {% if request.endpoint in ['my_cases', 'profile'] %}aria-current="page"{% endif %}>{{ t('my_cases') }}</a><a href="{{ url_for('new_case_form') }}" {% if request.endpoint == 'new_case_form' %}aria-current="page"{% endif %}>{{ t('new_case') }}</a>{% endif %}
+{% if identity.role == 'provider' %}<a href="{{ url_for('queue') }}" {% if request.endpoint == 'queue' %}aria-current="page"{% endif %}>{{ t('queue') }}</a>{% endif %}
+<span class="identity" dir="auto">{{ identity.name }} ({{ t(identity.role) }})</span>
+<form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>{{ t('logout') }}</button></form>
+{% else %}<a href="{{ url_for('login') }}" {% if request.endpoint == 'login' %}aria-current="page"{% endif %}>{{ t('login') }}</a><a href="{{ url_for('register') }}" {% if request.endpoint == 'register' %}aria-current="page"{% endif %}>{{ t('register') }}</a>{% endif %}
+</nav></div></header>
+{% for message in get_flashed_messages() %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
+<main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
 <script src="{{ url_for('static',filename='forms.js') }}" defer></script>
+<script src="{{ url_for('static',filename='camera.js') }}" defer></script>
 </body></html>

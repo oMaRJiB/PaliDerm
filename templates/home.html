@@ -1,1 +1,5 @@
-{% extends 'base.html' %}{% block content %}{% if identity and identity.role == 'worker' %}<p>{{ t('worker_blocked') }}</p>{% else %}<p>{{ t('demo_auth') }}</p><a href="{{ url_for('register') }}">{{ t('register') }}</a>{% endif %}{% endblock %}
+{% extends 'base.html' %}{% block content %}<h2>{{ t('home') }}</h2>
+{% if identity and identity.role == 'worker' %}<p class="notice">{{ t('worker_blocked') }}</p>
+{% elif identity and identity.role == 'patient' %}<p>{{ t('patient_home') }}</p><div class="actions"><a class="button" href="{{ url_for('new_case_form') }}">{{ t('new_case') }}</a><a class="button secondary" href="{{ url_for('my_cases') }}">{{ t('my_cases') }}</a></div>
+{% elif identity and identity.role == 'provider' %}<p>{{ t('provider_home') }}</p><div class="actions"><a class="button" href="{{ url_for('queue') }}">{{ t('queue') }}</a></div>
+{% else %}<p>{{ t('home_help') }}</p><div class="actions"><a class="button" href="{{ url_for('login') }}">{{ t('login') }}</a><a class="button secondary" href="{{ url_for('register') }}">{{ t('register') }}</a></div>{% endif %}{% endblock %}

@@ -1,0 +1,50 @@
+{% from 'macros.html' import token,text with context %}
+<p>{{ t('intake_help') }}</p>
+<form class="intake-form" method="post" enctype="multipart/form-data" action="{{ url_for('save_intake',case_id=case.case_id) }}">
+  {{ token() }}
+  <section aria-labelledby="details-heading">
+    <h3 id="details-heading">{{ t('case_details') }}</h3>
+    <div class="form-grid">
+      {{ text('chief_complaint',case.chief_complaint,true) }}
+      {{ text('duration_days',case.duration_days if case.duration_days is not none else '',type='number') }}
+    </div>
+  </section>
+  <fieldset class="symptom-grid"><legend>{{ t('symptoms') }}</legend>
+    {% for k in symptom_keys %}
+    <label>{{ t(k) }}<select name="{{ k }}">
+      {% for v,key in [('', 'unknown'),('0','no'),('1','yes')] %}
+      <option value="{{ v }}" {% if symptom and (symptom[k]|string if symptom[k] is not none else '') == v %}selected{% endif %}>{{ t(key) }}</option>
+      {% endfor %}
+    </select></label>
+    {% endfor %}
+    <label class="full-row">{{ t('additional_notes') }}<textarea name="additional_notes" dir="auto">{{ symptom.additional_notes or '' if symptom else '' }}</textarea></label>
+  </fieldset>
+  <fieldset class="body-sites"><legend>{{ t('body_sites') }}</legend>
+    {% for s in sites %}<label><input type="checkbox" name="body_sites" value="{{ s.body_site_id }}" {% if s.body_site_id in selected_sites %}checked{% endif %}>{{ t(s.site_name) }}</label>{% endfor %}
+  </fieldset>
+  <section aria-labelledby="photos-heading">
+    <h3 id="photos-heading">{{ t('photos_section') }}</h3>
+    <p>{{ image_help }}</p>
+    <label>{{ t('photo_body_site') }}<select name="photo_body_site">
+      {% for s in sites %}<option value="{{ s.body_site_id }}" {% if selected_sites and s.body_site_id == (selected_sites|min) %}selected{% endif %}>{{ t(s.site_name) }}</option>{% endfor %}
+    </select></label>
+    <div class="form-grid">
+      <label>{{ t('choose_photos') }}<input type="file" name="images" accept="image/jpeg,image/png" multiple data-image-input></label>
+      <label>{{ t('phone_camera') }}<input type="file" name="camera" accept="image/jpeg,image/png" capture="environment" data-image-input></label>
+    </div>
+    <p>{{ t('camera_help') }}</p>
+    <div class="camera" data-camera data-error="{{ t('camera_denied') }}" data-capture-error="{{ t('camera_capture_error') }}" data-ready="{{ t('camera_ready') }}" data-taken="{{ t('camera_taken') }}" data-filename="{{ t('camera_file') }}">
+      <button type="button" class="secondary" data-camera-start hidden>{{ t('camera_start') }}</button>
+      <div data-camera-panel hidden>
+        <video autoplay muted playsinline aria-label="{{ t('camera_video') }}"></video>
+        <div class="actions"><button type="button" data-camera-capture disabled>{{ t('camera_capture') }}</button><button type="button" class="secondary" data-camera-stop>{{ t('camera_stop') }}</button></div>
+      </div>
+      <p data-camera-message role="status"></p>
+    </div>
+  </section>
+  <section aria-labelledby="consent-heading">
+    <h3 id="consent-heading">{{ t('submission_section') }}</h3>
+    <label><input type="checkbox" name="consent" value="1">{{ t('consent') }}</label>
+    <div class="actions"><button type="submit" class="secondary" name="intake_action" value="save">{{ t('save_draft') }}</button><button type="submit" name="intake_action" value="submit">{{ t('submit') }}</button></div>
+  </section>
+</form>

@@ -1,3 +1,4 @@
+"""Synthetic end-to-end workflow, integrity and rollback regression coverage."""
 import hashlib
 import io
 import json
@@ -8,10 +9,18 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from PIL import Image
 from werkzeug.datastructures import MultiDict
+from cryptography.fernet import Fernet
 from app import create_app
+from backend.security import reveal, cipher, encrypt_text
+from backend.images import ImageStorage
+from backend.auth import AuthService
 from backend.db import connect, get_db
 from backend import services as svc
 from backend.ai.adapter import (AnalysisInput, AnalysisOutput, Candidate, AIUnavailable, UnconfiguredAdapter)
+
+TEST_ENCRYPTION_KEY = Fernet.generate_key().decode('ascii')
+
+PASSWORD = 'Synthetic-test-password-123!'
 
 ARABIC = '  شكوى جلدية — حكة في اليد؛ ملاحظات تجريبية  '
 
@@ -28,7 +37,7 @@ class WorkflowSupport:
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name)
-        self.config = {'TESTING': True, 'SECRET_KEY': 'test-only',
+        self.config = {'TESTING': True, 'SECRET_KEY': 'test-only', 'ENCRYPTION_KEY': TEST_ENCRYPTION_KEY, 'ENCRYPTION_KEY_FILE': None,
                        'DATABASE': str(self.path/'test.sqlite3'), 'UPLOAD_DIR': str(self.path/'uploads')}
         self.app = create_app(self.config)
         self.client = self.app.test_client()
@@ -38,13 +47,20 @@ class WorkflowSupport:
             with svc.transaction() as db:
                 db.execute("INSERT INTO Provider(name) VALUES('Synthetic Clinician')")
                 db.execute("INSERT INTO Provider(name) VALUES('Other Clinician')")
+        with self.app.app_context():
+            auth = AuthService()
+            for ident in (1, 2):
+                auth.provision(f'patient{ident}', PASSWORD, 'patient', patient_id=ident)
+                auth.provision(f'provider{ident}', PASSWORD, 'provider', provider_id=ident)
+            auth.provision('worker', PASSWORD, 'worker')
         self.login('patient:1')
 
     def login(self, identity):
         self.client.get('/login')
         with self.client.session_transaction() as session:
             csrf = session['csrf']
-        return self.client.post('/login', data={'identity': identity, 'csrf': csrf})
+        username = 'worker' if identity == 'worker-demo' else identity.replace(':', '')
+        return self.client.post('/login', data={'username': username, 'password': PASSWORD, 'csrf': csrf})
 
     def post(self, path, data=None):
         self.client.get('/login')
@@ -90,6 +106,11 @@ class WorkflowSupport:
         data.update(updates)
         return data
 
+    def field(self, table, key):
+        """Read a decoded clinical field explicitly; raw scalar() still tests actual SQL."""
+        with self.app.app_context():
+            return reveal(table, get_db().execute(f'SELECT * FROM {table}').fetchone())[key]
+
     def scalar(self, sql, params=()):
         with self.app.app_context():
             return get_db().execute(sql, params).fetchone()[0]
@@ -123,16 +144,16 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertIn('  عمر تجريبي  ', page.get_data(as_text=True))
         with browser.get('/images/1') as image_response:
             self.assertEqual(image_response.status_code, 200)
-        self.assertEqual(self.scalar('SELECT chief_complaint FROM DermCase'), ARABIC)
+        self.assertEqual(self.field('DermCase', 'chief_complaint'), ARABIC)
         self.assertEqual(self.scalar('SELECT count(*) FROM LesionImage'), 2)
-        self.assertEqual(self.scalar('PRAGMA user_version'), 2)
+        self.assertEqual(self.scalar('PRAGMA user_version'), 4)
 
     def test_submission_consent_and_nulls_idempotent_freeze(self):
         cid = self.draft()
         self.assertEqual(self.post(f'/cases/{cid}/submit', {'consent': '1'}).status_code, 400)
         self.details(cid)
-        self.assertIsNone(self.scalar('SELECT itching FROM Symptom'))
-        self.assertEqual(self.scalar('SELECT pain FROM Symptom'), 0)
+        self.assertIsNone(self.field('Symptom', 'itching'))
+        self.assertEqual(self.field('Symptom', 'pain'), 0)
         self.assertEqual(self.post(f'/cases/{cid}/submit', {'consent': '1'}).status_code, 400)
         self.upload(cid)
         self.assertEqual(self.post(f'/cases/{cid}/submit').status_code, 400)
@@ -146,9 +167,13 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.upload(cid).status_code, 409)
 
     def test_validation_dates_durations_and_booleans(self):
-        self.assertEqual(self.post('/patients/new', {'first_name': 'x', 'last_name': 'y', 'date_of_birth': '2025-02-30'}).status_code, 400)
-        self.assertEqual(self.post('/patients/new', {'first_name': 'x', 'last_name': 'y', 'date_of_birth': '2999-01-01'}).status_code, 400)
-        self.assertEqual(self.post('/patients/new', {'first_name': '   ', 'last_name': 'y'}).status_code, 400)
+        self.post('/logout')
+        credentials = {'username': 'newpatient', 'password': PASSWORD, 'password_confirm': PASSWORD}
+        for values in ({'first_name':'x','last_name':'y','date_of_birth':'2025-02-30'},
+                       {'first_name':'x','last_name':'y','date_of_birth':'2999-01-01'},
+                       {'first_name':'   ','last_name':'y'}):
+            self.assertEqual(self.post('/patients/new', {**credentials, **values}).status_code, 400)
+        self.login('patient:1')
         for value in ('-1', '1.5', 'nan', '99999999999999999999999999', ' 1'):
             self.assertEqual(self.post('/patients/1/cases', {'chief_complaint': 'Demo', 'duration_days': value}).status_code, 400)
         cid = self.draft()
@@ -156,10 +181,10 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.details(cid, body_sites=['999']).status_code, 400)
         self.assertEqual(self.scalar('SELECT count(*) FROM Symptom'), 0)
         self.assertEqual(self.details(cid, duration_days='').status_code, 302)
-        self.assertIsNone(self.scalar('SELECT duration_days FROM DermCase'))
+        self.assertIsNone(self.field('DermCase', 'duration_days'))
         self.details(cid, additional_notes='  نص عربي  ')
         self.assertEqual(self.scalar('SELECT count(*) FROM Symptom'), 1)
-        self.assertEqual(self.scalar('SELECT additional_notes FROM Symptom'), '  نص عربي  ')
+        self.assertEqual(self.field('Symptom', 'additional_notes'), '  نص عربي  ')
 
     def test_authorization_private_images_assignment_and_worker(self):
         cid = self.submitted()
@@ -191,7 +216,7 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.client.post('/patients/new', data={'first_name': 'x','last_name':'y'}).status_code, 400)
         self.assertEqual(self.client.get('/', environ_overrides={'REMOTE_ADDR': '192.0.2.1'}).status_code, 403)
         self.assertEqual(self.client.get('/', headers={'Host': 'malicious.example'}).status_code, 403)
-        self.assertEqual(self.post('/login', {'identity': 'patient:999'}).status_code, 400)
+        self.assertEqual(self.post('/login', {'identity': 'patient:999'}).status_code, 401)
 
     def test_upload_validation_hash_metadata_and_rollback(self):
         cid = self.draft()
@@ -206,7 +231,8 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.upload(cid, 1).status_code, 302)
         with self.app.app_context():
             row = get_db().execute('SELECT * FROM LesionImage').fetchone()
-            stored = (self.path/'uploads'/row['image_uri']).read_bytes()
+            stored = ImageStorage(self.app.config).read_original(row['image_uri'], row['content_sha256'])
+            self.assertNotEqual(stored, (self.path/'uploads'/row['image_uri']).read_bytes())
             self.assertEqual(hashlib.sha256(stored).hexdigest(), row['content_sha256'])
             self.assertEqual(row['mime_type'], 'image/png')
             with Image.open(io.BytesIO(stored)) as im:
@@ -214,9 +240,10 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.details(cid, body_sites=[]).status_code, 400)
         self.app.config['MAX_IMAGE_COUNT'] = 1
         self.assertEqual(self.upload(cid, 1).status_code, 400)
+        # Legacy app pixel caps no longer reject ordinary photos.
         self.app.config['MAX_IMAGE_PIXELS'] = 10
         self.app.config['MAX_IMAGE_COUNT'] = 12
-        self.assertEqual(self.upload(cid, 1).status_code, 400)
+        self.assertEqual(self.upload(cid, 1).status_code, 302)
 
     def test_review_validation_primary_referral_date(self):
         cid = self.submitted()
@@ -274,7 +301,7 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.login('patient:1')
         self.assertIn('Please clarify', self.client.get(f'/cases/{cid}').get_data(as_text=True))
         self.assertEqual(self.details(cid).status_code, 409)
-        self.assertEqual(self.scalar('SELECT chief_complaint FROM DermCase'), ARABIC)
+        self.assertEqual(self.field('DermCase', 'chief_complaint'), ARABIC)
         self.assertEqual(self.scalar('SELECT count(*) FROM Diagnosis'), 0)
 
     def test_referral_without_diagnosis(self):
@@ -299,12 +326,12 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
             self.assertEqual(db.execute('PRAGMA foreign_keys').fetchone()[0], 1)
             self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
             with self.assertRaises(sqlite3.IntegrityError), svc.transaction() as db:
-                db.execute("INSERT INTO Diagnosis(case_id,review_id,diagnosis_name) VALUES(999,1,'Invalid cross case')")
+                db.execute('INSERT INTO Diagnosis(case_id,review_id,diagnosis_name) VALUES(999,1,?)', (encrypt_text('Diagnosis','diagnosis_name','Invalid cross case'),))
             with self.assertRaises(sqlite3.IntegrityError), svc.transaction() as db:
-                db.execute("INSERT INTO Diagnosis(case_id,review_id,diagnosis_name) VALUES(1,1,'Second primary')")
+                db.execute('INSERT INTO Diagnosis(case_id,review_id,diagnosis_name) VALUES(1,1,?)', (encrypt_text('Diagnosis','diagnosis_name','Second primary'),))
             with svc.transaction() as db:
-                other = db.execute("INSERT INTO DermCase(patient_id,chief_complaint) VALUES(2,'Other demo')").lastrowid
-                aid = db.execute("INSERT INTO AIAnalysis(case_id,model_name,model_version,prompt_version,input_snapshot_json) VALUES(?,'test','1','not-applicable','{}')", (other,)).lastrowid
+                other = db.execute('INSERT INTO DermCase(patient_id,chief_complaint,encrypted_duration) VALUES(2,?,?)', (encrypt_text('DermCase','chief_complaint','Other demo'), cipher().encrypt(None,'DermCase.duration_days'))).lastrowid
+                aid = db.execute("INSERT INTO AIAnalysis(case_id,model_name,model_version,prompt_version,input_snapshot_json) VALUES(?,'test','1','not-applicable',?)", (other, json.dumps({'encrypted':cipher().encrypt('{}','AIAnalysis.input_snapshot_json')}))).lastrowid
             with self.assertRaises(sqlite3.IntegrityError), svc.transaction() as db:
                 db.execute('UPDATE ProviderReview SET analysis_id=? WHERE review_id=1', (aid,))
 
@@ -315,7 +342,7 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.scalar('SELECT count(*) FROM AIAnalysis'), 0)
         self.assertIn('AI integration pending', self.client.get(f'/cases/{cid}').get_data(as_text=True))
         with self.app.app_context():
-            request = svc.build_analysis_input(cid, {'role':'provider','id':1})
+            request = svc.CaseWorkflow({'role':'provider','id':1}).build_analysis_input(cid)
             snapshot = json.loads(json.dumps(asdict(request), ensure_ascii=False))
             self.assertIsNone(snapshot['symptoms']['itching'])
             self.assertEqual(snapshot['symptoms']['pain'], 0)
@@ -330,7 +357,7 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
     def test_invalid_ai_output_contract(self):
         cid = self.submitted()
         with self.app.app_context():
-            request = svc.build_analysis_input(cid, {'role':'provider','id':1})
+            request = svc.CaseWorkflow({'role':'provider','id':1}).build_analysis_input(cid)
             output = AnalysisOutput('SIMULATED AI — not model inference', 'fixture-1', 'not-applicable', 'undetermined',
                                     'Synthetic fixture only', 'No inference', 'Not clinical', (Candidate('Synthetic fixture label',1),))
             output.validate(request)
@@ -349,7 +376,7 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
             db.execute('CREATE TABLE Source(value TEXT)')
             db.execute("INSERT INTO Source VALUES('preserve me')")
             db.commit()
-        with self.assertRaisesRegex(RuntimeError,'expected SQLite user_version 2'):
+        with self.assertRaisesRegex(RuntimeError,'expected SQLite user_version 4'):
             create_app({**self.config, 'DATABASE':str(wrong)})
         with closing(sqlite3.connect(wrong)) as db:
             self.assertEqual(db.execute('SELECT value FROM Source').fetchone()[0], 'preserve me')

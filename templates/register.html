@@ -1,2 +1,7 @@
 {% extends 'base.html' %}{% from 'macros.html' import token, text with context %}{% block content %}
-<h2>{{ t('register') }}</h2><form method="post">{{ token() }}{{ text('first_name',required=true) }}{{ text('last_name',required=true) }}{{ text('date_of_birth',type='date') }}{{ text('sex') }}{{ text('phone',type='tel') }}{{ text('email',type='email') }}<button>{{ t('save') }}</button></form>{% endblock %}
+<h2>{{ t('register') }}</h2><p>{{ t('signup_help') }}</p>
+<form class="auth-form" method="post">{{ token() }}
+<label>{{ t('username') }}<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="64" pattern="[A-Za-z0-9._-]{3,64}"></label>
+<label>{{ t('password') }}<input type="password" name="password" dir="auto" autocomplete="new-password" required minlength="12" maxlength="256"></label>
+<label>{{ t('password_confirm') }}<input type="password" name="password_confirm" dir="auto" autocomplete="new-password" required minlength="12" maxlength="256"></label>
+{{ text('first_name',required=true) }}{{ text('last_name',required=true) }}{{ text('date_of_birth',type='date') }}<label>{{ t('sex') }}<select name="sex">{% for value in ['unknown','female','male'] %}<option value="{{ value }}">{{ t('gender_' + value) }}</option>{% endfor %}</select></label>{{ text('phone',type='tel') }}{{ text('email',type='email') }}<button>{{ t('register') }}</button></form>{% endblock %}
