@@ -1,0 +1,21 @@
+{
+  "target_classes": [
+    "Acne/Follicular",
+    "Bacterial Infection",
+    "Benign Lesion",
+    "Dermatitis/Eczema",
+    "Fungal Infection",
+    "Hair/Nail Disorder",
+    "Inflammatory/Autoimmune",
+    "Malignancy/Precancer",
+    "Other",
+    "Parasite/Bite",
+    "Pigment Disorder",
+    "Trauma/Wound",
+    "Vascular/Purpura",
+    "Viral Infection"
+  ],
+  "image_size": 224,
+  "normalization": "RGB float32 /255, letterbox",
+  "model_variant": "custom CNN AdamW augmentation v2"
+}

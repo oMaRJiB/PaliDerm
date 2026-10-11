@@ -1,3 +1,36 @@
 {% macro token() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
 {% macro text(key, value='', required=false, type='text') %}<label>{{ t(key) }}<input type="{{ type }}" name="{{ key }}" value="{{ value if value is not none else '' }}" dir="{{ 'ltr' if type in ['email','tel','date','number'] else 'auto' }}" {% if required %}required{% endif %} {% if type == 'number' %}min="0" step="1"{% endif %}></label>{% endmacro %}
 {% macro patient_details(p) %}<h2>{{ t('profile') }}</h2><dl>{% for key in ['first_name','last_name','date_of_birth','sex','phone','email'] %}<dt>{{ t(key) }}</dt><dd dir="{{ 'ltr' if key in ['phone','email','date_of_birth'] else 'auto' }}">{{ t('gender_' + p[key]) if key == 'sex' else (p[key] or t('unknown')) }}</dd>{% endfor %}</dl>{% endmacro %}
+
+{% macro model_questions(groups, required=false) %}
+<input type="hidden" name="model_questionnaire_version" value="1">
+<p>{{ t('checkbox_help') }}</p>
+{% for group in groups %}
+<fieldset><legend>{{ t(group.label_key) }}</legend>
+{% if group.name != 'demographics' %}
+<div class="check-grid">
+{% for field in group.fields %}
+<label class="check-option" for="model-{{ field.name }}"><input id="model-{{ field.name }}" type="checkbox" name="model_{{ field.name }}" value="1"{% if field.value == 1 %} checked{% endif %}{% if field.locked %} disabled{% endif %}><span>{{ t(field.label_key) }}{% if field.value == 0 %}<small class="field-help"> {{ t('saved_no') }}</small>{% endif %}</span></label>
+{% endfor %}
+</div>
+<label class="group-confirm"><input type="checkbox" name="model_group_answered_{{ group.name }}" value="1"{% if group.complete %} checked{% endif %}>{{ t('checkbox_complete') }}</label>
+{% else %}
+<div class="form-grid">
+{% for field in group.fields %}
+{% if field.readonly %}<div><p><strong>{{ t(field.label_key) }}</strong><br>{{ t('scin_' + field.value) if field.value else t('unknown') }}</p><p class="field-help">{{ t('derived_profile' if field.name in ['age_group','sex_at_birth'] else 'saved_patient_answer') }}</p></div>
+{% else %}<label for="model-{{ field.name }}">{{ t(field.label_key) }}<select id="model-{{ field.name }}" name="model_{{ field.name }}"{% if required %} required{% endif %}>
+<option value="">{{ t('choose') }}</option>{% for option in field.options %}<option value="{{ option.value }}"{% if option.value == field.value %} selected{% endif %}>{{ t(option.label_key) }}</option>{% endfor %}
+</select></label>{% endif %}
+{% endfor %}
+</div>
+{% endif %}
+</fieldset>
+{% endfor %}
+{% endmacro %}
+
+{% macro model_answer_summary(groups) %}
+<details><summary>{{ t('patient_model_questions') }}</summary>
+{% for group in groups %}<h3>{{ t(group.label_key) }}</h3><dl>{% for field in group.fields %}<dt>{{ t(field.label_key) }}</dt><dd>{{ t('unknown') if field.value is none else (t('yes' if field.value else 'no') if field.kind == 'binary' else t('scin_' + field.value)) }}</dd>{% endfor %}</dl>{% endfor %}
+</details>
+{% endmacro %}
+{% macro timestamp(value) %}{% if value %}<time datetime="{{ value }}" data-local-time dir="auto">{{ value }} {{ t('utc_time') }}</time>{% else %}{{ t('unknown') }}{% endif %}{% endmacro %}

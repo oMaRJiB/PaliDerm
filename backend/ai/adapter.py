@@ -34,6 +34,8 @@ class AnalysisInput:
     symptoms: dict[str, int | str | None]
     lesions: tuple[LesionInput, ...]
     submitted_at: str
+    # v1.1 adds attempt-specific provider answers; v1.0 callers remain compatible.
+    model_metadata: dict[str, int | str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,8 @@ class AnalysisOutput:
     limitations: str
     candidates: tuple[Candidate, ...] = ()
     image_quality: dict[int, str] = field(default_factory=dict)
+    # Optional additive contract; existing adapters and stored attempts stay valid.
+    assisted_triage: dict | None = None
 
     def validate(self, request: AnalysisInput):
         """Reject malformed output and cross-case image references; never infer clinical thresholds."""
@@ -66,6 +70,21 @@ class AnalysisOutput:
                 raise ValueError('Missing output text')
         if self.triage_level not in {'red', 'amber', 'green', 'undetermined'}:
             raise ValueError('Invalid triage')
+        if self.assisted_triage is not None:
+            result = self.assisted_triage
+            if (not isinstance(result, dict)
+                    or result.get('triage_level') not in {'emergency', 'urgent', 'routine'}
+                    or type(result.get('needs_manual_review')) is not bool
+                    or result.get('triage_method') != 'rules_with_model_input'
+                    or not isinstance(result.get('triage_reasons'), list)
+                    or not result['triage_reasons']
+                    or any(not isinstance(reason, str) or not reason.strip() for reason in result['triage_reasons'])):
+                raise ValueError('Invalid assisted triage')
+            priority = {'emergency':'red', 'urgent':'amber', 'routine':'green'}[result['triage_level']]
+            if result['triage_level'] == 'routine' and result['needs_manual_review']:
+                priority = 'undetermined'
+            if self.triage_level != priority:
+                raise ValueError('Inconsistent assisted triage priority')
         for rank, item in enumerate(self.candidates, 1):
             if not isinstance(item, Candidate) or type(item.rank) is not int or item.rank != rank:
                 raise ValueError('Candidates must have consecutive ordered ranks')
@@ -100,11 +119,16 @@ class AIUnavailable(Exception):
 
 
 class UnconfiguredAdapter:
-    """Default boundary that never produces fabricated analysis or diagnoses."""
+    """Disabled/unavailable boundary that never fabricates analysis or diagnoses."""
+    def __init__(self, notice_key='ai_pending'):
+        """Keep absent inference distinct from an explicitly selected broken bundle."""
+        self.notice_key = notice_key
+
     def analyze_case(self, input: AnalysisInput) -> AnalysisOutput:
         """Raise AIUnavailable rather than creating an inference attempt or synthetic result."""
         raise AIUnavailable('AI integration pending')
 
 
-# Set create_app({"AI_ADAPTER": your_adapter}) to opt into inference. Default is unconfigured.
+# Standalone contract default; Flask selects Omar's saved bundle via MODEL_PATH,
+# or accepts an explicit create_app({"AI_ADAPTER": your_adapter}) override.
 adapter: Adapter = UnconfiguredAdapter()

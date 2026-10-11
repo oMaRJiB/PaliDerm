@@ -1,2 +1,2 @@
 {% extends 'base.html' %}{% from 'macros.html' import token,text with context %}{% block content %}
-<h2>{{ t('new_case') }}</h2><form class="auth-form" method="post" action="{{ url_for('new_case',patient_id=patient.patient_id) }}">{{ token() }}{{ text('chief_complaint',required=true) }}{{ text('duration_days',type='number') }}<button>{{ t('new_case') }}</button></form>{% endblock %}
+<h2>{{ t('new_case') }}</h2><form class="auth-form" method="post" action="{{ url_for('new_case',patient_id=patient.patient_id) }}">{{ token() }}{{ text('chief_complaint',required=true) }}<button>{{ t('new_case') }}</button></form>{% endblock %}

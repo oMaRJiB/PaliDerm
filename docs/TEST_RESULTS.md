@@ -1,3 +1,195 @@
+# Minimal UI tidy-up and device-local times — 2026-10-11
+
+Shared CSS now gives pages a restrained white surface, cleaner spacing, softer
+form borders, clearer navigation/table rows and a small labeled AI priority panel.
+Mobile layouts, native controls, keyboard focus and logical RTL-ready properties
+remain intact. No new dependencies, model/schema/notebook changes or backend
+workflow changes. Visual/native-device verification remains unavailable because
+Computer Use permissions were not granted during the previous pass.
+
+The shared timestamp macro emits UTC-labeled HTML time elements for case creation,
+submission/consent, clinician reviews and AI history. Existing forms.js formats
+only these timestamps using the browser's Intl timezone/locale and shows a brief
+device-timezone notice. Original UTC is retained in datetime/title; no-JavaScript
+and unsupported-formatting fallback remains UTC. DOB and follow-up dates are never
+converted. All new interface labels stay in the translation catalog.
+
+JavaScript DOM-double smoke **PASS** for timezone-less SQLite timestamps treated
+as UTC, ISO offsets, summer/winter DST, previous-day conversion, invalid-time
+preservation, timezone notice and unchanged datetime attributes. Existing
+assignment, form recovery, retry, duplicates, redirect and image-preview checks
+also pass. New HTTP presentation test covers shared timestamp markup, profile and
+queue timestamps, missing-value fallback and unchanged database timestamp.
+
+Files changed: `static/app.css`, `static/forms.js`, `backend/i18n.py`,
+`templates/base.html`, `templates/macros.html`, `templates/case.html`,
+`templates/profile.html`, `templates/queue.html`, `tests/forms_smoke.mjs`,
+`tests/test_presentation.py`, `README.md`, `docs/TEST_RESULTS.md`.
+
+Focused regression command (same suite as the previous pass) — **92 tests PASS
+in 29.941s**. JavaScript smoke passed in the Node REPL. `git diff --check` passed.
+No real browser/device visual verification or new model training was performed.
+Server restarted on 127.0.0.1:5000, background PID **7163** at verification;
+saved records/accounts and the encryption key were preserved.
+
+# Assignment button and readable AI report verification — 2026-10-11
+
+- Reproduced the JavaScript assignment regression before the fix using
+  `tests/forms_smoke.mjs` in the Node REPL: the hidden `name="action"` control
+  shadows `form.action`, so enhanced submission targets the input rather than
+  the transition URL. Reading the HTML method/action attributes fixes assignment,
+  revision and close without changing authorization or case transitions.
+- Updated JavaScript smoke test **PASS**: named-action destination, confirmed
+  redirect, server/network error recovery, retry, duplicate prevention, close
+  cancellation and image preview/removal. Uses DOM doubles, not a real browser.
+- `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_presentation test_triage test_ai_runner test_workflow test_auth test_encryption test_intake test_local_model_adapter -q`:
+  **91 tests PASS in 30.297s**. Added enhanced assignment/ownership checks,
+  readable percent boundaries, shortened legacy explanation display, expandable
+  suggestions/details and unchanged stored candidate scores.
+- `tests/live_smoke.py --with-model`, with the same environment/command recorded
+  below: **PASS**. Actual HTTP assignment, existing saved-model inference,
+  clinician review/treatment/referral, patient release and child-process restart
+  preserve encrypted inputs/results/triage, Arabic text and image bytes. The
+  first smoke run exposed an outdated assertion for the deliberately replaced
+  technical summary; updated it to verify percentage labels and prototype notice,
+  then reran successfully. Normal application data untouched by tests.
+- Report shows three suggestions first, whole-percent AI match scores and a
+  clear explanation that percentages are not diagnosis probabilities or severity.
+  Full narratives/remaining suggestions/history stay expandable. Known historical
+  triage explanations are shortened for presentation without rewriting records.
+  Priority rules, thresholds, saved scores, AI inference and clinician authority
+  are unchanged. No notebooks, model artifacts, schema or dependencies changed.
+- Native Safari verification was unavailable because Computer Use permissions
+  are not granted. Real browser clicks/mobile appearance/Arabic RTL are **NOT
+  RUN**; JavaScript and HTTP checks above are separate from browser verification.
+
+Files changed: `app.py`, `backend/i18n.py`, `static/forms.js`,
+`templates/case.html`, `tests/forms_smoke.mjs`, `tests/test_presentation.py`,
+`tests/test_ai_runner.py`, `tests/http_smoke.py`, `README.md`,
+`docs/TEST_RESULTS.md`. Existing blocked long-term requirements remain pending.
+
+Final wording rerun: `test_presentation test_triage` — **14 tests PASS in
+3.601s**. `git diff --check` passed. Server restarted with existing data on
+127.0.0.1:5000, debug off, background PID **5727** at verification.
+
+# Local reset and minimal AI-assisted triage verification — 2026-10-11
+
+This latest update supersedes earlier statements that records/accounts were
+preserved during development and that no triage policy was configured. The user
+explicitly requested a demo reset and illustrative prototype rules. No notebooks,
+models, training artifacts, schema SQL or encryption key were changed in this run.
+
+- `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_triage test_encryption test_auth test_workflow test_intake test_presentation test_ai_runner test_local_model_adapter -q`: **88 tests PASS in 28.310s**. The eight new tests cover emergency precedence, urgent symptom combinations, top-only model mapping, invalid/missing/uncertain/unknown output, explicit negative answers/free-text exclusion, actual 14-label mapping, encrypted triage/UI/ownership and guarded reset/default CLI key selection. Initial run found a test-only macOS `/var` versus `/private/var` path comparison; normalized the expected path and reran successfully.
+- After strengthening reset session-secret rotation coverage, `test_triage` reran: **8 tests PASS in 1.109s**. Default session secret changes, encryption key is retained, repeated reset creates five accounts/one case/one image, unrelated upload files survive, password file is 0600 and foreign keys remain valid.
+- `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg MPLCONFIGDIR=.cache/matplotlib TF_CPP_MIN_LOG_LEVEL=3 TF_NUM_INTEROP_THREADS=1 TF_NUM_INTRAOP_THREADS=1 .venv/bin/python -B tests/live_smoke.py --with-model`: **PASS** with approved loopback access. Actual saved-model inference after patient questionnaire, clinician diagnosis/treatment/referral and patient release all work. An actual server-process restart preserves encrypted triage, 36 model answers, predictions, Arabic text and identical image bytes. Temporary synthetic test database only.
+- Actual requested active demo reset executed successfully with `reset-demo --confirm-demo --purge-images --create-test-accounts`. Verified **2 patients, 2 providers, 1 submitted case, 1 image, 5 accounts, 0 AI attempts, 0 reviews**, no foreign-key violations, and successful password login for patient1, patient2, clinician1, clinician2 and worker1. Credentials are private/ignored in `instance/test-accounts.txt`; worker-assisted submission remains blocked.
+- Direct `create_app()` with no key environment configuration now loads the same existing local key as the launcher; no regeneration or plaintext fallback. Missing/invalid/explicit key checks remain covered. Existing encryption key and source artifacts preserved; old migration backups are outside this reset and still need separate archival/removal.
+- Restarted `./run-local.sh`, debug off, on **127.0.0.1:5000**, background PID **3032** at verification. `git diff --check` passed. No deployment/push. No real-device/browser visual/Arabic RTL checks were run for this narrowly scoped change.
+
+Exact illustrative rules/mappings, the unvalidated 0.5 uncertainty flag, manual
+reset/start/stop instructions and persistence format are in README and
+docs/AI_INTEGRATION.md. Clinician assessment remains independent. AT-06 has
+prototype rule checks passing; clinically validated emergency screening and the
+remaining blocked long-term requirements are not claimed complete.
+
+Files changed in this run: `.env.example`, `AGENTS.md`, `README.md`, `app.py`,
+`backend/demo.py`, `backend/i18n.py`, `backend/services.py`,
+`backend/ai/adapter.py`, `backend/ai/local_adapter.py`, `backend/ai/runner.py`,
+`backend/ai/triage.py`, `templates/case.html`, `tests/test_triage.py`,
+`tests/live_smoke.py`, `implementation.md`, `docs/AI_INTEGRATION.md`,
+`docs/TEST_RESULTS.md`. Runtime demo data/password/session files are Git-ignored.
+
+# Patient questionnaire verification — 2026-10-11
+
+This update supersedes provider-only model-question collection below. Patients
+can save the extra questions with draft intake and submission; clinicians reuse
+those recorded answers and fill only missing values. No notebooks, saved models,
+schema SQL, key files or pre-existing workspace clinical records were changed.
+
+- `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_encryption test_auth test_workflow test_intake test_presentation test_ai_runner test_local_model_adapter -q` — **80 tests PASS in 29.820s**. Includes 10 added tests for native checkbox/range controls, profile age/sex mapping and age-band boundaries, nullable checkbox groups, existing No preservation, encrypted extra answers/restart/Arabic, old-record compatibility, malformed/duplicate/spoofed inputs, whole-intake rollback, ownership/CSRF/submitted freeze, saved patient answers feeding inference, and missing answers blocking only inference. Existing consent/camera/images/review/encryption/authorization tests still pass.
+- After correcting the outdated submission notice, `test_presentation` reran: **3 tests PASS in 1.341s**. Submission now truthfully confirms clinician review without claiming model integration is pending.
+- `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg MPLCONFIGDIR=.cache/matplotlib TF_CPP_MIN_LOG_LEVEL=3 TF_NUM_INTEROP_THREADS=1 TF_NUM_INTRAOP_THREADS=1 .venv/bin/python -B tests/live_smoke.py --with-model` — **PASS** outside the sandbox after its initial loopback bind refusal. Actual HTTP signup/login → patient select-all checkbox groups/direct duration range → file + camera upload/consent → provider assignment → actual saved SCIN model without re-entering patient answers → review/treatment/referral → patient release. Actual child-process stop/restart preserved all 36 encrypted model answers, derived age/sex, successful predictions, Arabic text and identical source image bytes. The inference snapshot exactly matched the saved patient model mapping. Temporary synthetic database only; no normal demo records/accounts changed.
+- Checkbox semantics: checked is Yes; explicitly confirming a group makes unanswered unchecked items No. Unconfirmed untouched choices remain NULL and prior No values persist. Provider controls for recorded answers are disabled/read-only; server validation also rejects attempts to change them. Incomplete model inputs do not block patient submission or manual clinician review.
+- Server-derived age uses DOB at case submission. Missing DOB and ages outside 18–79 use AGE_UNKNOWN. Per Omar's instruction, the existing canonical encrypted profile `sex` field now supplies sex at birth and is labeled accordingly. No demographic guesses or extra frontend demographic answers are used. Duration uses saved ranges; explicitly selecting a range on a draft replaces exact-day duration with NULL rather than inventing days.
+- No migration: the existing authenticated `Symptom.answers` envelope optionally adds nested `model_metadata`; its six original answer fields and older envelopes remain compatible. Runtime user_version remains **4**; source SQL and inference architecture/artifacts are unchanged. Submitted cases remain frozen; legacy missing answers can be completed by a clinician for an analysis attempt.
+- Local app restarted with `./run-local.sh`, debug off, encrypted dataset/key and selected model retained; loopback listener PID at verification: **98453**. Modified Python sources parse and `git diff --check` passed. No deployment/push or new implementation folders/files.
+
+Files modified in this pass: `backend/preprocessing.py`, `backend/services.py`,
+`backend/ai/local_adapter.py`, `backend/i18n.py`, `app.py`, `templates/intake.html`,
+`templates/macros.html`, `templates/case.html`, `templates/new_case.html`,
+`static/app.css`, `tests/test_intake.py`, `tests/test_local_model_adapter.py`,
+`tests/test_presentation.py`, `tests/http_smoke.py`, `tests/live_smoke.py`,
+`README.md`, `AGENTS.md`, `implementation.md`, `docs/AI_INTEGRATION.md`,
+`docs/MODEL_INTERFACE.md`, `docs/ARCHITECTURE.md`, `docs/ENCRYPTION.md`,
+`docs/REQUIREMENTS.md`, and this report.
+
+AT-01, AT-03, AT-04, AT-05 and AT-07 through AT-12 retain the qualified PASS
+statuses in the table below; AT-02 worker attribution and AT-06 automated safety
+remain BLOCKED. Structured history, durable submission revisions, full Arabic
+translations/RTL, production security, independent model calibration and actual
+browser/mobile/camera visual/hardware checks remain pending. HTTP and HTML checks
+do not constitute those visual/hardware checks. Full MVP completion is not claimed.
+
+---
+
+# Saved SCIN model application integration — 2026-10-11
+
+These results supersede earlier statements that real inference is unconfigured.
+Omar's existing `SCIN_custom_model.keras` is selected; no notebooks, training
+code or model/encoder/class artifacts were modified. Runtime remains SQLite v4;
+no schema change or migration was needed for supplemental model-answer snapshots.
+
+- Application command: `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_encryption test_auth test_workflow test_intake test_presentation test_ai_runner test_local_model_adapter -v` (equivalent combined loader executed): **70 tests PASS in 24.698s**. Includes 13 new local-adapter tests for lazy factory selection, explicitly disabled/missing bundles, all required answers, known-answer/none-flag contradictions, NULL preservation, labeled provider-only controls, authorization, authenticated image reading, encrypted snapshots/results, artifact-change rejection, invalid outputs, retries and independent manual review after failure.
+- Standalone interface: `PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg MPLCONFIGDIR=.cache/matplotlib TF_CPP_MIN_LOG_LEVEL=3 TF_NUM_INTEROP_THREADS=1 TF_NUM_INTRAOP_THREADS=1 .venv/bin/python -B -m unittest discover -s tests -p test_model_interface.py -v` — **13 tests PASS in 13.198s**. **83 automated tests passed in total.** Existing PyTorch Python-3.14/TorchScript and Keras/NumPy deprecation warnings remain; no test failure or skip occurred. Unrelated EDA/training-artifact tests were outside this application pass.
+- **Actual saved-model inference PASS:** isolated encrypted Flask test client, two synthetic PNGs, all 31 binary and five categorical answers explicitly supplied, 68 encoded features, 14 finite ranked outputs summing to 0.99999993. First load plus inference took **2.281s on CPU**. Original unknown itching remained NULL while the supplemental explicit answer was recorded separately. No clinician Diagnosis was generated, priority remained undetermined and images remained unassessed. Clinician review/patient release and fresh-app encrypted-result/image/Arabic retrieval passed. SHA-256 of all three supplied model artifacts was identical before/after.
+- **Actual HTTP model workflow and child-process restart PASS:** ran the existing isolated `tests/live_smoke.py` harness with an in-memory hook after clinician assignment to submit the real 36-field model form. Actual `.keras` inference completed with 14 encrypted candidates, followed by diagnosis/treatment/referral/follow-up, patient release and stop/restart of the Flask subprocess. Successful AI history, all candidates, exact Arabic text and image bytes survived. Workspace demo records/accounts were untouched. The sandbox could not bind the test server; approved execution outside the sandbox passed.
+- **Startup PASS:** default application selected SCINModelAdapter and 14 classes without importing TensorFlow, Keras, Torch or NumPy. `pip check` reported no broken installed requirements. Actual environment: Python 3.14.7, SQLite 3.53.4, Flask 3.1.2, Werkzeug 3.1.9, Pillow 12.3.0, cryptography 50.0.2, TensorFlow **2.22.0rc0** (release candidate), Keras 3.15.1 and NumPy 2.5.4. No dependencies or models were downloaded/installed.
+- Restarted the loopback server with `./run-local.sh`, debug off, selected model enabled, existing encrypted dataset/key retained. Background PID at verification: **92389**. Approved real HTTP GET `/login` and `/patients/new` both returned **200**. `git diff --check` passed. No deployment or push.
+- Browser inventory returned no connected browser surface. Actual visual/mobile/keyboard/camera and complete Arabic RTL verification remain **NOT RUN**; labeled native controls/rendered HTML assertions and HTTP workflows are separate software checks.
+
+| ID | Current result | Qualification |
+|---|---|---|
+| AT-01 | PASS for supported account/profile fields | Structured medical history remains pending. |
+| AT-02 | BLOCKED | Worker grants and submitting-user attribution still absent. |
+| AT-03 | PASS | Encrypted intake, multiple images/camera fields and consent. |
+| AT-04 | PASS for supported roles | Authorized decrypted cases/results/images. |
+| AT-05 | PASS for selected-model integration | Actual 14-group model outputs persisted as unconfirmed suggestions; no clinical accuracy/calibration claim. |
+| AT-06 | PARTIAL / prototype checks PASS | User-authorized illustrative rules and encrypted results implemented; clinical validation/full emergency-screening requirements remain pending. |
+| AT-07 | PASS | Independent atomic clinician review, including after AI failure. |
+| AT-08 | PASS | Clinician diagnosis/treatment/follow-up persistence. |
+| AT-09 | PASS for clinician documentation | Referral saved; no automatic escalation. |
+| AT-10 | PASS | Actual HTTP process restart preserves encrypted AI/clinical/image/Arabic data. |
+| AT-11 | PASS for local controls | Role/ownership/assignment/CSRF/private storage; production hardening pending. |
+| AT-12 | PASS for implemented boundary | Missing answers, unavailable model, invalid output/failure/timeout/retry/history and manual review. |
+
+Remaining limitations: missing binary answers intentionally block inference, never
+manual review; multiple-image probability averaging is not independently validated;
+scores are uncalibrated and grouped, with no image-quality or clinical-priority
+classifier. A current bundle fingerprint cannot prove historical training-encoder
+provenance absent from the original export. Production hardening, structured history,
+worker attribution, durable submission revisions, automated safety screening and
+full Arabic/browser checks remain pending. Full MVP completion is not claimed.
+
+Files changed for this integration: `app.py`, `backend/ai/adapter.py`,
+`backend/ai/runner.py`, new `backend/ai/local_adapter.py`, `backend/i18n.py`,
+`templates/case.html`, `run-local.sh`, `.env.example`, new
+`requirements-inference.txt`, `tests/test_workflow.py`, new
+`tests/test_local_model_adapter.py`, `README.md`, `AGENTS.md`, `implementation.md`,
+`docs/AI_INTEGRATION.md`, `docs/MODEL_INTERFACE.md`, `docs/REQUIREMENTS.md` and this
+report. Earlier encryption/migration edits and pre-existing notebook/artifact
+working-tree changes were preserved.
+
+---
+
+# Encryption startup/migration corrections — 2026-10-11
+
+- Application regression command: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p test_encryption.py -v` for the focused suite; the combined `test_encryption`, `test_auth`, `test_workflow`, `test_intake`, `test_presentation` and `test_ai_runner` suites ran together: **57 tests PASS in 28.082 seconds**, including seven new regression tests. Model-training tests were outside this backend-only pass.
+- New checks cover direct startup selecting encrypted paths while preserving legacy sources, missing-copy refusal/no automatic key, wrong keys/explicit plaintext paths rejected, duplicate image rows preserved with one encrypted object, conflicting image metadata rollback, invalid image identifiers returning controlled CLI errors, existing destination guidance/no overwrite, and failed fresh initialization safely retrying without copy migration.
+- `ENCRYPTION_KEY_FILE=instance/encryption.key PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m flask --app app init-db` **PASS**: direct CLI verified the existing encrypted v4 database. Its saved key matches, SQLite quick check is `ok`, and foreign-key check has no violations. No workspace migration, key replacement or password reset was performed.
+- `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B tests/live_smoke.py` **PASS**: actual HTTP signup/login/logout, two-image intake/consent, clinician review with diagnosis/treatment/referral, patient outcome and child-process restart preserving Arabic text and exact decrypted images. The initial sandboxed attempt could not start the loopback server; the approved rerun outside the sandbox passed. Only isolated temporary synthetic records were used.
+- `git diff --check` **PASS**. No Jupyter notebooks or ML artifacts were edited. Existing schema versions and AI adapter behavior are unchanged. Broader deferred requirements and the AT-01 through AT-12 status table below remain applicable.
+- Restarted the existing local background server with `./run-local.sh`, debug off, using the existing encrypted dataset/key. Current PID at verification: **85448**. Actual HTTP `/login` and `/patients/new` both returned **200**; loopback checks required approved execution outside the sandbox. No external deployment or push.
+
 # Encryption/gender verification — 2026-10-10
 
 These results supersede previous runtime/security statements below. Source schema.sql v2 and auth_migration.sql v3 are unchanged; active runtime requires encrypted v4. No AI development or deployment/push occurred.

@@ -1,0 +1,7 @@
+# Optional saved-Keras-model inference runtime, verified in the local Python 3.14 venv.
+# TensorFlow's installed 3.14-compatible build is a release candidate.
+# This file is independent of notebook/training dependencies.
+-r requirements.txt
+numpy==2.5.4
+tensorflow==2.22.0rc0
+keras==3.15.1

@@ -2,7 +2,7 @@
 <html lang="{{ locale }}" dir="{{ direction }}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ t('app_title') }}</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='app.css') }}">
-</head><body data-working="{{ t('working') }}" data-network-error="{{ t('network_error') }}" data-remove="{{ t('remove_selection') }}" data-selected-preview="{{ t('selected_preview') }}" data-preview-unavailable="{{ t('preview_unavailable') }}">
+</head><body data-working="{{ t('working') }}" data-network-error="{{ t('network_error') }}" data-remove="{{ t('remove_selection') }}" data-selected-preview="{{ t('selected_preview') }}" data-preview-unavailable="{{ t('preview_unavailable') }}" data-time-local="{{ t('time_local_notice') }}">
 <a class="skip-link" href="#main">{{ t('skip_content') }}</a>
 <header><div class="header-inner"><h1>{{ t('app_title') }}</h1><p>{{ t('prototype') }}</p><p class="emergency"><strong>{{ t('emergency') }}</strong></p>
 {% if locale == 'ar' %}<p>{{ t('arabic_pending') }}</p>{% endif %}
@@ -16,7 +16,7 @@
 {% else %}<a href="{{ url_for('login') }}" {% if request.endpoint == 'login' %}aria-current="page"{% endif %}>{{ t('login') }}</a><a href="{{ url_for('register') }}" {% if request.endpoint == 'register' %}aria-current="page"{% endif %}>{{ t('register') }}</a>{% endif %}
 </nav></div></header>
 {% for message in get_flashed_messages() %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
-<main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
+<main id="main" tabindex="-1">{% block content %}{% endblock %}<p class="time-note" data-timezone-notice hidden></p></main>
 <script src="{{ url_for('static',filename='forms.js') }}" defer></script>
 <script src="{{ url_for('static',filename='camera.js') }}" defer></script>
 </body></html>

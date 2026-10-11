@@ -1,5 +1,16 @@
 # Structure and request flow, with a Tkinter comparison
 
+Patient SCIN questions use `SCINQuestionnaire` in the existing
+`backend/preprocessing.py`. The route passes the form to CaseWorkflow; the service
+authorizes the patient/draft, validates checkbox groups and duration categories,
+derives profile categories, and encrypts the extra mapping inside the existing
+Symptom answer envelope in the same intake transaction. Jinja macros render the
+native controls and read-only answers. This is like a Tkinter button callback
+calling a questionnaire/service object, then displaying the returned state in
+widgets; presentation does not own persistence or authorization. Inference consumes
+the same recorded answers through the existing adapter, with no tensor handling
+in Flask routes and no schema migration.
+
 This presentation pass keeps Flask, Jinja, SQLite and the existing folders. The existing cohesive backend classes already meet the requested object-oriented structure; they were preserved. No generic repository layer, new framework or class-per-page hierarchy was introduced.
 
 ## Current folders and files

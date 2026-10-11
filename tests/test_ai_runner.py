@@ -35,7 +35,7 @@ class AIRunnerTests(WorkflowSupport, unittest.TestCase):
         self.assertEqual(self.scalar('SELECT status FROM AIAnalysis ORDER BY analysis_id DESC LIMIT 1'),'failed')
         self.assertEqual(self.scalar('SELECT error_message FROM AIAnalysis ORDER BY analysis_id DESC LIMIT 1'),'adapter_error')
         page = self.client.get(f'/cases/{cid}').get_data(as_text=True)
-        self.assertIn('Latest successful AI analysis',page)
+        self.assertIn('Latest AI result',page)
         self.assertIn('SIMULATED AI — not model inference',page)
         self.assertNotIn('SENSITIVE ADAPTER DETAIL',page)
         self.assertEqual(self.scalar("SELECT count(*) FROM AIAnalysis WHERE status='completed'"),1)

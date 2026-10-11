@@ -111,16 +111,24 @@ def initialize(path, encryption):
     except FileExistsError:
         pass
     else:
-        path.chmod(0o600)
-        with closing(connect(path)) as db:
-            db.executescript((ROOT / 'schema.sql').read_text(encoding='utf-8'))
-            _apply_auth(db)
-            apply_encryption_schema(db, encryption)
+        try:
+            path.chmod(0o600)
+            with closing(connect(path)) as db:
+                db.executescript((ROOT / 'schema.sql').read_text(encoding='utf-8'))
+                _apply_auth(db)
+                apply_encryption_schema(db, encryption)
+        except BaseException:
+            # Only this call's new file is disposable. Otherwise a failed fresh
+            # setup looks like legacy v3 data and wrongly demands copy migration.
+            path.unlink(missing_ok=True)
+            raise
     with closing(connect(path)) as db:
         version = db.execute('PRAGMA user_version').fetchone()[0]
         if version != RUNTIME_VERSION:
             if version == 3:
-                raise RuntimeError('Plaintext runtime v3 is not supported. Stop the server and run the explicit copy migration: '
+                raise RuntimeError('The selected DATABASE is plaintext runtime v3. If already migrated, set '
+                                   'DATABASE=instance/encrypted/demo.sqlite3 and UPLOAD_DIR=instance/encrypted/uploads. '
+                                   'Otherwise stop the server and run the explicit copy migration: '
                                    'python -m backend.migrate_encryption (see docs/ENCRYPTION.md). No data was modified.')
             if version == 2:
                 raise RuntimeError(f'{path}: authentication requires user_version 3; found 2. Stop the server, then run '

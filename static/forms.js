@@ -1,6 +1,36 @@
 // Progressive enhancements only: authorization and validation stay on the server.
 (() => {
   const messages = document.body.dataset;
+  // Timestamp display only: SQL and datetime attributes retain their UTC values.
+  // SQLite's timezone-less timestamp format explicitly means UTC here. Date-only
+  // birthdays/follow-up dates are never selected, avoiding calendar-day shifts.
+  const timestamps = document.querySelectorAll('time[data-local-time]');
+  if (timestamps.length && typeof Intl !== 'undefined') {
+    try {
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+      });
+      let converted = false;
+      timestamps.forEach(element => {
+        let raw = element.getAttribute('datetime').trim().replace(' ', 'T');
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(raw)) return;
+        if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)) raw += 'Z';
+        const instant = new Date(raw);
+        if (Number.isNaN(instant.getTime())) return;
+        element.title = element.textContent; // Original UTC value remains inspectable.
+        element.textContent = formatter.format(instant);
+        converted = true;
+      });
+      const notice = document.querySelector('[data-timezone-notice]');
+      if (converted && notice) {
+        notice.textContent = messages.timeLocal;
+        notice.hidden = false;
+      }
+    } catch (_) {
+      // Unsupported Intl/device settings leave explicitly labeled UTC intact.
+    }
+  }
   function feedback(form) {
     let box = form.querySelector('.form-feedback');
     if (!box) {
@@ -22,7 +52,7 @@
   }
   document.addEventListener('submit', async event => {
     const form = event.target;
-    if (form.method.toLowerCase() !== 'post') return;
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
     if (form.dataset.submitting) { event.preventDefault(); return; }
     const confirmation = form.querySelector('[data-confirm]');
     if (confirmation && !window.confirm(confirmation.dataset.confirm)) {
@@ -43,7 +73,9 @@
     box.setAttribute('role', 'status');
     box.textContent = messages.working;
     try {
-      const response = await fetch(form.action, {method: 'POST', body: payload, credentials: 'same-origin', headers: {'X-Form-Response': 'json'}});
+      // Named controls (such as name="action") can shadow form.action.
+      // Read HTML attributes so assignment/revision/close keep their actual URL.
+      const response = await fetch(form.getAttribute('action') || window.location.href, {method: 'POST', body: payload, credentials: 'same-origin', headers: {'X-Form-Response': 'json'}});
       if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
         const result = await response.json();
         const destination = new URL(result.redirect, window.location.href);

@@ -38,7 +38,8 @@ class WorkflowSupport:
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name)
         self.config = {'TESTING': True, 'SECRET_KEY': 'test-only', 'ENCRYPTION_KEY': TEST_ENCRYPTION_KEY, 'ENCRYPTION_KEY_FILE': None,
-                       'DATABASE': str(self.path/'test.sqlite3'), 'UPLOAD_DIR': str(self.path/'uploads')}
+                       'DATABASE': str(self.path/'test.sqlite3'), 'UPLOAD_DIR': str(self.path/'uploads'),
+                       'AI_ADAPTER': UnconfiguredAdapter()}
         self.app = create_app(self.config)
         self.client = self.app.test_client()
         with self.app.app_context():

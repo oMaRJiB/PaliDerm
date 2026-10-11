@@ -5,6 +5,9 @@ set -eu
 cd -- "$(dirname -- "$0")"
 export DATABASE="${DATABASE:-instance/encrypted/demo.sqlite3}"
 export UPLOAD_DIR="${UPLOAD_DIR:-instance/encrypted/uploads}"
+export MODEL_PATH="${MODEL_PATH-notebooks/SCIN_custom_model.keras}"
+# Include bounded cold-start time for the explicitly selected local model.
+export AI_TIMEOUT_SECONDS="${AI_TIMEOUT_SECONDS:-60}"
 if [ -z "${ENCRYPTION_KEY:-}" ]; then
     export ENCRYPTION_KEY_FILE="${ENCRYPTION_KEY_FILE:-instance/encryption.key}"
 fi

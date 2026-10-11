@@ -25,7 +25,7 @@ def recover_interrupted(path):
                        "WHERE status IN ('pending','running')", (svc.now(),))
 
 
-def run_analysis(case_id, identity, adapter, analysis_base, timeout):
+def run_analysis(case_id, identity, adapter, analysis_base, timeout, *, supplemental=None):
     """Orchestrate an existing adapter call with encrypted snapshots/results and timeout/retry history."""
     svc.role(identity, 'provider')
     workflow = svc.CaseWorkflow(identity)
@@ -46,6 +46,11 @@ def run_analysis(case_id, identity, adapter, analysis_base, timeout):
             if str(latest_id) != analysis_base or latest and latest['status'] in ('pending', 'running'):
                 return latest_id  # repeated form POST returns the existing attempt
             payload = workflow.build_analysis_input(case_id)
+            prepare = getattr(adapter, 'prepare_input', None)
+            if prepare is not None:
+                # Validate before creating an attempt; retries preserve both the
+                # original submitted case and exact provider-supplied model input.
+                payload = prepare(payload, supplemental)
             # Keep JSON-valid schema storage while encrypting the exact immutable input.
             snapshot = json.dumps({'encrypted': cipher().encrypt(
                 json.dumps(asdict(payload), ensure_ascii=False, allow_nan=False), 'AIAnalysis.input_snapshot_json')})
@@ -74,11 +79,19 @@ def run_analysis(case_id, identity, adapter, analysis_base, timeout):
             output.validate(payload)
             if (output.model_name, output.model_version, output.prompt_version) != metadata:
                 raise ValueError('Output metadata mismatch')
+            # Store the optional structured result in an encrypted, versioned
+            # narrative envelope. The immutable input snapshot is never edited,
+            # and no schema change or plaintext clinical column is introduced.
+            rationale = output.rationale
+            if output.assisted_triage is not None:
+                rationale = json.dumps({'format':'paliderm-triage-v1',
+                                        'rationale':rationale, 'triage':output.assisted_triage},
+                                       ensure_ascii=False, allow_nan=False)
             with svc.transaction() as db:
                 db.execute("UPDATE AIAnalysis SET status='completed',completed_at=?,triage_level=?,summary=?,rationale=?,limitations=? "
                            'WHERE analysis_id=?',
                            (svc.now(),output.triage_level,encrypt_text('AIAnalysis','summary',output.summary),
-                            encrypt_text('AIAnalysis','rationale',output.rationale),
+                            encrypt_text('AIAnalysis','rationale',rationale),
                             encrypt_text('AIAnalysis','limitations',output.limitations),attempt))
                 for candidate in output.candidates:
                     db.execute('INSERT INTO AICandidate(analysis_id,rank,diagnosis_name,confidence,rationale) VALUES(?,?,?,?,?)',

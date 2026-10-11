@@ -1,5 +1,42 @@
 # Reconciled implementation decisions
 
+## Minimal prototype triage and local reset — 2026-10-11
+
+The user's latest request authorizes only the existing-model rule layer and demo reset; no notebook/model/training changes. The saved SCIN bridge calls deterministic triage_case after inference. Structured shortness of breath raises emergency; rapid worsening or fever with discharge raises urgent; only top-ranked Malignancy/Precancer raises model-based urgent. All other actual supported labels have routine mappings, never lowering symptom urgency. Missing/invalid inputs, unmapped labels, Other or top score below configurable AI_TRIAGE_DEMO_THRESHOLD=0.5 require manual review. Threshold and rules are illustrative/unvalidated, not treatment guidance or full AT-06 validation.
+
+Persist triage and original narrative in the existing encrypted AIAnalysis.rationale envelope, preserving immutable inputs and legacy results, with no schema changes. Routine plus manual-review flag maps to undetermined, never green; clinician priority/review remains independent. New strings remain centralized; Arabic translations/full RTL verification are still pending. README contains exact rules/mappings and manual reset commands. Direct Flask and launcher select the same existing local encryption key unless explicitly overridden; no key generation/plaintext fallback. Authorized reset clears active demo records/accounts/generated images, rotates default sessions, seeds synthetic records and privately writes fresh test credentials. Preserve all notebooks/models/code, encryption key and original migration sources/backups. Worker/revision/history and other previously blocked requirements remain pending.
+
+## Patient questionnaire update — 2026-10-11
+
+Patients can now save the additional SCIN answers with drafts and submission.
+The existing encrypted Symptom answer envelope stores nested `model_metadata`;
+SQL remains v4, source schemas are unchanged, and old six-answer envelopes remain
+compatible. Native checkbox tiles replace binary dropdowns. Group confirmation
+makes unchecked choices explicit No; otherwise they remain unknown, preserving
+previously recorded No answers. Sex at birth reuses the profile's canonical `sex`
+field as explicitly requested; age group derives from DOB at submission. Duration
+uses the given saved categories without inventing an exact day count. Clinician
+analysis reuses these answers and accepts only missing supplemental values.
+Older submitted cases remain frozen and clinician review remains independent of
+model completeness. This supersedes earlier provider-only/separate-sex-entry
+statements below; all other pending requirements and model limitations remain.
+
+## Saved-model integration update — 2026-10-11
+
+Omar has authorized inference using the existing `notebooks/SCIN_custom_model.keras`
+bundle. This supersedes statements below that actual inference is awaiting a model.
+The application now uses a lazy adapter selected by administrator `MODEL_PATH`;
+an empty value retains the unconfigured boundary. The supplied model has 14 grouped
+outputs and consumes 31 binary answers plus five categorical fields (68 encoded
+features). Providers must supply missing answers explicitly, preserved with each
+encrypted analysis snapshot; the submitted questionnaire is unchanged. No schema,
+training code, notebooks or saved artifacts are changed for this integration.
+Scores are not clinically calibrated; triage stays undetermined and image quality
+unassessed. Automated safety screening, independent clinical model evaluation,
+worker attribution/history/revisions and other pending requirements below remain
+pending. See `docs/AI_INTEGRATION.md` and `docs/TEST_RESULTS.md` for the integration
+contract and actual verification; full MVP completion is not claimed.
+
 This document preserves every requirement of the supplied `implementaton.md` (renamed `implementation.md`). The following decisions resolve conflicts with the SQL v2 schema and Omar's instruction to integrate AI himself. They govern the plan below; blocked P0 requirements remain required for the full MVP, not silently demoted.
 
 - **Stack:** For an empty repository select Flask, Jinja HTML/CSS/vanilla JavaScript, SQLite, private local image storage, server-side-authorized sessions, Git/GitHub, and local deployment. Reuse an existing working stack and document the reason. No model/vendor is selected: Omar supplies inference.

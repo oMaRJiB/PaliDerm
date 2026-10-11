@@ -1,5 +1,39 @@
 # Hacklanta teledermatology MVP — development instructions
 
+## Current user-authorized prototype triage/reset update (2026-10-11)
+
+The latest request authorizes a small illustrative deterministic triage policy after existing SCIN inference. This supersedes earlier prohibitions on adding rules only for this limited prototype feature; do not develop/train/change any model or notebook. Use structured answers, emergency precedence, an editable mapping of the actual 14 model labels and a configurable unvalidated uncertainty flag. Preserve clinician control; routine with missing/uncertain inputs must display “Priority undetermined — manual review needed”. All output is labeled “AI-assisted triage — prototype; clinician review required.” Exact rules and limitations are documented in README. This is not clinical validation or full completion of AT-06.
+
+Direct Flask CLI and the launcher may select the same existing private instance/encryption.key when no environment/config key source is supplied; never generate a replacement or fall back to plaintext. The authorized local demo reset may clear demo records/accounts/generated uploads and reseed synthetic test logins, preserving encryption key, code, notebooks, models and original migration sources. Guard it to demo.sqlite3 and its dedicated sibling uploads directory. Keep generated plaintext demo passwords only in ignored mode-0600 instance/test-accounts.txt. Reset invalidates default file-managed sessions; an externally configured SECRET_KEY must be rotated by its operator. See README for manual reset/start/stop commands.
+
+## Patient questionnaire update — 2026-10-11
+
+Omar authorized patient entry of SCIN questions, select-all checkbox controls,
+profile-derived sex at birth/age group, and directly selected duration ranges.
+Reuse the encrypted `Symptom.encrypted_answers` envelope: preserve the six existing
+answers and add a nested `model_metadata` mapping, without changing SQL v4 or the
+source schema. Unanswered boxes stay NULL; an explicit group confirmation makes
+unchecked answers No, while previously recorded No values are retained. Patient
+draft edits are authorized; submitted records remain frozen. The existing canonical
+profile `sex` field is reused as sex at birth per Omar's instruction; retain its
+English enum values and historical data. Derive age for the submission date, with
+the saved unknown category for missing DOB or ages outside the trained bands.
+Missing model answers still block only inference. No notebook, model, training,
+automated clinical policy or external deployment changes are authorized.
+
+## Authorized saved-model integration — 2026-10-11
+
+Omar explicitly selected `SCIN_custom_model.keras` for application inference.
+This supersedes the earlier unconfigured application default below; it does not
+authorize model development, training, downloads or notebook changes. Select the
+saved bundle through administrator-only `MODEL_PATH` (empty disables inference).
+Preserve the typed adapter boundary, encrypted image/snapshot storage and independent
+clinician review. Require all missing model inputs explicitly; never fill unknown
+binary symptoms with zero. Supplemental provider answers belong to the encrypted
+analysis snapshot, not a silent edit of the submitted questionnaire. Model scores
+remain unconfirmed and uncalibrated; no clinical priority policy is supplied.
+Other pending MVP requirements remain required and must not be claimed complete.
+
 ## Goal and authority
 Build a working, mobile-first patient-to-clinician teledermatology workflow for Omar's first Hacklanta submission. Omar is implementing the AI separately. Deliver the application, database integration, and a replaceable AI boundary; do not develop, train, download, or select an AI model on his behalf.
 

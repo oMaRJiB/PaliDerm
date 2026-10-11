@@ -1,28 +1,46 @@
-{% extends 'base.html' %}{% from 'macros.html' import token,text,patient_details with context %}{% block content %}
+{% extends 'base.html' %}{% from 'macros.html' import token,text,patient_details,model_questions,model_answer_summary,timestamp with context %}{% block content %}
 <h2>{{ t('case_details') }}{% if identity.role == 'provider' %} <bdi dir="ltr">{{ case.case_id }}</bdi>{% endif %}</h2><p>{{ t('status') }}: <span class="badge" data-state="{{ case.status }}">{{ t(case.status) }}</span></p>
 {{ patient_details(patient) }}
 {% if case.status == 'draft' and identity.role == 'patient' %}
 {% include 'intake.html' %}
 {% else %}
-<dl><dt>{{ t('chief_complaint') }}</dt><dd dir="auto">{{ case.chief_complaint }}</dd><dt>{{ t('duration_days') }}</dt><dd>{{ case.duration_days if case.duration_days is not none else t('unknown') }}</dd><dt>{{ t('submitted_at') }}</dt><dd dir="ltr">{{ case.submitted_at }}</dd><dt>{{ t('consent_record') }}</dt><dd dir="ltr">{{ case.consent_at }} / {{ case.consent_version }}</dd></dl>
+<dl><dt>{{ t('chief_complaint') }}</dt><dd dir="auto">{{ case.chief_complaint }}</dd><dt>{{ t('scin_condition_duration') if model_answers.get('condition_duration') else t('duration_days') }}</dt><dd>{{ t('scin_' + model_answers.condition_duration) if model_answers.get('condition_duration') else (case.duration_days if case.duration_days is not none else t('unknown')) }}</dd><dt>{{ t('submitted_at') }}</dt><dd dir="ltr">{{ timestamp(case.submitted_at) }}</dd><dt>{{ t('consent_record') }}</dt><dd dir="ltr">{{ timestamp(case.consent_at) }} / {{ case.consent_version }}</dd></dl>
 <h3>{{ t('symptoms') }}</h3><dl>{% for k in symptom_keys %}<dt>{{ t(k) }}</dt><dd>{{ t('unknown') if not symptom or symptom[k] is none else t('yes' if symptom[k] else 'no') }}</dd>{% endfor %}<dt>{{ t('additional_notes') }}</dt><dd dir="auto">{{ symptom.additional_notes or t('empty') if symptom else t('empty') }}</dd></dl>
 <h3>{{ t('body_sites') }}</h3><ul>{% for l in lesions %}<li>{{ t(l.site_name) }}</li>{% endfor %}</ul>
+{{ model_answer_summary(patient_model_groups) }}
 {% endif %}
 <h3>{{ t('images') }}</h3><div class="image-grid">{% for i in images %}<figure><a href="{{ url_for('image',image_id=i.image_id) }}"><img src="{{ url_for('image',image_id=i.image_id) }}" alt="{{ t('image') }}: {{ t(i.site_name) }}"></a><figcaption>{{ t(i.site_name) }} — {{ t('image_quality') }}: {{ t(i.image_quality) }}</figcaption></figure>{% else %}<p>{{ t('empty') }}</p>{% endfor %}
 </div>
 {% if case.status == 'needs_information' %}<p>{{ t('resubmit_blocked') }}</p>{% endif %}
 <h2>{{ t('released') }}</h2>
 {% if latest %}
-<dl><dt>{{ t('decision') }}</dt><dd>{{ t(latest.decision) }}</dd><dt>{{ t('triage_level') }}</dt><dd><span class="badge" data-state="{{ latest.triage_level }}">{{ t(latest.triage_level) }}</span></dd><dt>{{ t('patient_message') }}</dt><dd dir="auto">{{ latest.patient_message }}</dd><dt>{{ t('reviewed_at') }}</dt><dd dir="ltr">{{ latest.reviewed_at }}</dd><dt>{{ t('provider') }}</dt><dd dir="auto">{{ latest.name }}</dd></dl>
+<dl><dt>{{ t('decision') }}</dt><dd>{{ t(latest.decision) }}</dd><dt>{{ t('triage_level') }}</dt><dd><span class="badge" data-state="{{ latest.triage_level }}">{{ t(latest.triage_level) }}</span></dd><dt>{{ t('patient_message') }}</dt><dd dir="auto">{{ latest.patient_message }}</dd><dt>{{ t('reviewed_at') }}</dt><dd dir="ltr">{{ timestamp(latest.reviewed_at) }}</dd><dt>{{ t('provider') }}</dt><dd dir="auto">{{ latest.name }}</dd></dl>
 <h3>{{ t('diagnoses') }}</h3><ul>{% for d in diagnoses %}<li><span dir="auto">{{ d.diagnosis_name }}</span> — {{ t(d.certainty) }}{% if d.is_primary %} ({{ t('primary') }}){% endif %}</li>{% else %}<li>{{ t('empty') }}</li>{% endfor %}</ul>
 <h3>{{ t('treatments') }}</h3>{% for tr in treatments %}<dl><dt>{{ t('diagnosis_name') }}</dt><dd dir="auto">{{ tr.diagnosis_name }}</dd>{% for key in ['medication','dosage','instructions'] %}<dt>{{ t(key) }}</dt><dd dir="auto">{{ tr[key] or t('empty') }}</dd>{% endfor %}</dl>{% else %}<p>{{ t('empty') }}</p>{% endfor %}
 {% if latest.referral_required %}<dl>{% for key in ['referral_destination','referral_reason'] %}<dt>{{ t(key) }}</dt><dd dir="auto">{{ latest[key] }}</dd>{% endfor %}</dl>{% endif %}<p>{{ t('followup_date') }}: <bdi dir="ltr">{{ latest.followup_date or t('empty') }}</bdi></p>
 {% else %}<p>{{ t('no_result') }}</p>{% endif %}
 {% if identity.role == 'provider' %}
-<h2>{{ t('ai') }}</h2><p>{{ t('ai_configured' if ai_configured else 'ai_pending') }}</p><p>{{ t('ai_disclaimer') }}</p><p>{{ t('quality_warning') }}</p>
-<form method="post" action="{{ url_for('analyze',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="analysis_base" value="{{ analyses[0].analysis_id if analyses else 0 }}"><button>{{ t('ai_request') }}</button></form>
-<h3>{{ t('ai_history') }}</h3><ul>{% for a in analyses %}<li><bdi dir="ltr">{{ a.analysis_id }} / {{ a.started_at }} / {{ a.model_name }}</bdi>: {{ t(a.status) }}{% if a.error_message %} — {{ t(a.error_message) }}{% endif %}</li>{% else %}<li>{{ t('no_analysis') }}</li>{% endfor %}</ul>
-{% if latest_success %}<h3>{{ t('latest_success') }}</h3><p dir="auto">{{ latest_success.summary }}</p><p>{{ t(latest_success.triage_level) }}</p><p dir="auto">{{ latest_success.rationale }}</p><p dir="auto">{{ latest_success.limitations }}</p><ol>{% for c in candidates %}<li dir="auto">{{ c.diagnosis_name }}{% if c.confidence is not none %} ({{ t('confidence') }}: {{ c.confidence }}){% endif %} {{ c.rationale or '' }}</li>{% endfor %}</ol>{% endif %}
+<h2>{{ t('ai') }}</h2>{% if not ai_configured %}<p>{{ t(ai_notice_key|default('ai_pending')) }}</p>{% endif %}<p>{{ t('ai_disclaimer') }}</p>
+<form method="post" action="{{ url_for('analyze',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="analysis_base" value="{{ analyses[0].analysis_id if analyses else 0 }}">
+{% if ai_input_groups %}
+<h3>{{ t('ai_inputs_title') }}</h3><p id="ai-input-help">{{ t('ai_inputs_help') }}</p>
+{{ model_questions(ai_input_groups, required=true) }}
+{% endif %}
+<button>{{ t('ai_request') }}</button></form>
+<details><summary>{{ t('ai_history') }}</summary><ul>{% for a in analyses %}<li><bdi dir="ltr">{{ a.analysis_id }} / {{ timestamp(a.started_at) }} / {{ a.model_name }}</bdi>: {{ t(a.status) }}{% if a.error_message %} — {{ t(a.error_message) }}{% endif %}</li>{% else %}<li>{{ t('no_analysis') }}</li>{% endfor %}</ul></details>
+{% macro suggestions(items, start=1) %}<ol class="ai-suggestions" start="{{ start }}">{% for c in items %}<li><span dir="auto">{{ c.diagnosis_name }}</span> — {{ t('confidence') }}: <bdi dir="ltr">{{ c.confidence|ai_score }}</bdi></li>{% endfor %}</ol>{% endmacro %}
+{% if latest_success %}<h3>{{ t('latest_success') }}</h3>
+{% if latest_success.model_name.startswith('SIMULATED') %}<p dir="auto">{{ latest_success.model_name }}</p>{% endif %}
+{% if latest_success.assisted_triage %}{% set triage = latest_success.assisted_triage %}
+<section class="ai-triage" data-state="{{ latest_success.triage_level }}" aria-label="{{ t('assisted_triage_notice') }}">
+<h4>{{ t('assisted_triage_notice') }}</h4>
+<p><strong>{% if triage.triage_level == 'routine' and triage.needs_manual_review %}{{ t('triage_manual') }}{% else %}{{ t('triage_' ~ triage.triage_level) }}{% endif %}</strong></p>
+{% if triage.needs_manual_review and triage.triage_level != 'routine' %}<p>{{ t('triage_review_required') }}</p>{% endif %}
+<ul>{% for reason in triage.triage_reasons %}<li dir="auto">{{ reason|brief_triage }}</li>{% endfor %}</ul>
+</section>{% else %}<p>{{ t(latest_success.triage_level) }}</p>{% endif %}
+<p>{{ t('ai_score_help') }}</p>{{ suggestions(candidates[:3]) }}
+{% if candidates|length > 3 %}<details><summary>{{ t('ai_more_suggestions') }}</summary>{{ suggestions(candidates[3:], start=4) }}</details>{% endif %}
+<details><summary>{{ t('ai_report_details') }}</summary><p dir="auto">{{ latest_success.summary }}</p><p dir="auto">{{ latest_success.rationale }}</p><p dir="auto">{{ latest_success.limitations }}</p><p>{{ t('quality_warning') }}</p>{% for c in candidates if c.rationale %}<p dir="auto">{{ c.diagnosis_name }}: {{ c.rationale }}</p>{% endfor %}</details>{% endif %}
 {% if case.status == 'submitted' %}<form method="post" action="{{ url_for('transition',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="action" value="claim"><button>{{ t('claim') }}</button></form>{% endif %}
 {% if case.status == 'reviewed' %}{% for action,key in [('revise','revision'),('close','close')] %}<form method="post" action="{{ url_for('transition',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="action" value="{{ action }}">{% if action == 'close' %}<input type="hidden" data-confirm="{{ t('confirm_close') }}">{% endif %}<button>{{ t(key) }}</button></form>{% endfor %}{% endif %}
 {% if case.status == 'in_review' %}
@@ -33,6 +51,6 @@
 <fieldset><legend>{{ t('diagnoses') }}</legend>{% for n in range(3) %}<fieldset><legend>{{ t('diagnosis_name') }} {{ n+1 }}</legend><label>{{ t('diagnosis_name') }}<input name="diagnosis_{{ n }}" dir="auto"></label><label>{{ t('certainty') }}<select name="certainty_{{ n }}"><option value="provisional">{{ t('provisional') }}</option><option value="confirmed">{{ t('confirmed') }}</option></select></label><label><input type="radio" name="primary" value="{{ n }}" {% if n==0 %}checked{% endif %}>{{ t('primary') }}</label>{% for k in ['medication','dosage'] %}<label>{{ t(k) }}<input name="{{ k }}_{{ n }}" dir="auto"></label>{% endfor %}<label>{{ t('instructions') }}<textarea name="instructions_{{ n }}" dir="auto"></textarea></label></fieldset>{% endfor %}</fieldset>
 <label><input type="checkbox" name="referral_required" value="1">{{ t('referral_required') }}</label>{{ text('referral_destination') }}<label>{{ t('referral_reason') }}<textarea name="referral_reason" dir="auto"></textarea></label>{{ text('followup_date',type='date') }}<button>{{ t('review') }}</button></form>{% endif %}
 {% if latest %}<h3>{{ t('clinical_notes') }}</h3><p dir="auto">{{ latest.clinical_notes or t('empty') }}</p>{% endif %}
-<h3>{{ t('review_history') }}</h3>{% for r in reviews %}<details><summary>{{ r.review_id }} — {{ t(r.decision) }} — <bdi dir="ltr">{{ r.reviewed_at }}</bdi></summary><p dir="auto">{{ r.patient_message }}</p><p dir="auto">{{ r.clinical_notes or '' }}</p></details>{% endfor %}
+<h3>{{ t('review_history') }}</h3>{% for r in reviews %}<details><summary>{{ r.review_id }} — {{ t(r.decision) }} — <bdi dir="ltr">{{ timestamp(r.reviewed_at) }}</bdi></summary><p dir="auto">{{ r.patient_message }}</p><p dir="auto">{{ r.clinical_notes or '' }}</p></details>{% endfor %}
 {% endif %}
 {% endblock %}

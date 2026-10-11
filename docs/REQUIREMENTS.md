@@ -1,3 +1,22 @@
+# Saved-model integration update — 2026-10-11
+
+Patient questionnaire update: patients can save additional model answers with
+their own drafts/intake. Native checkbox groups preserve NULL versus explicit No;
+duration uses the trained ranges, age derives from DOB at submission, and profile
+sex is reused as sex at birth per Omar's instruction. Extras persist in the existing
+encrypted Symptom envelope without a migration. Submitted cases stay frozen;
+clinicians reuse known answers and fill only missing values. Prior provider-only
+or separately asked demographic descriptions are superseded by this update.
+
+Omar selected `SCIN_custom_model.keras`. The app now runs that saved model through
+the existing typed inference boundary; no model training, notebook/artifact edits
+or database migration were performed. All missing model answers are explicitly
+required and saved in encrypted attempt snapshots. Actual synthetic HTTP inference
+and process-restart persistence passed. Scores remain unconfirmed/uncalibrated,
+clinical triage is undetermined, and automated safety screening remains blocked.
+The following historical status text is updated only where this integration
+changes delivery; full MVP completion is not claimed.
+
 # Current encryption/gender update
 
 Runtime v4 is now required; supplied schema.sql v2 and the v3 Account extension remain preserved. Patient gender choices and deterministic one-hot/symptom helpers are implemented. Sensitive clinical fields and original images use authenticated Fernet encryption, with strict key configuration, authorized in-memory decryption, plaintext-write guards and explicit copy-only migration. See ENCRYPTION.md for exact protected fields and plaintext operational metadata.
@@ -19,7 +38,7 @@ The user's first-run delivery overrides broader completion gates. Root `AGENTS.m
 - Clinician assignment/authorization, independent manual review, optional clinician diagnoses/certainty/treatments, referral/follow-up, patient release, review history, explicit review revision and closure. One primary diagnosis when diagnoses exist. Review inserts and lifecycle update are atomic.
 - Queue status/reviewer filters and submission age; clinician priority and latest successful AI priority displayed separately. Provider phone access supports external communication only.
 - Local-only password-based patient/provider/worker accounts with patient-only public signup, separately provisioned privileged/existing-record accounts and a blocked-work notice for worker submissions. Server-side role/ownership checks, CSRF, loopback/Host gating. No public deployment or production security claim.
-- Typed AI adapter, honest unconfigured 503 with no attempt row, server-built immutable attempt snapshots, optional configured runner with timeout, output validation, sanitized failures, retries/history and restart recovery. Developer deterministic fixtures live only under tests and are explicitly simulated. No model/vendor selected or inference supplied.
+- Typed AI adapter, selected local saved-SCIN inference, encrypted immutable attempt snapshots and supplemental model answers, timeout, output validation, sanitized failures, retries/history and restart recovery. Explicitly empty MODEL_PATH retains honest unconfigured 503 with no attempt row. Developer deterministic fixtures live only under tests and are explicitly simulated.
 - General emergency guidance visible before uploads. Independent safety protocol defined; no automatic medical rules invented or activated.
 - English catalog with en/ar locale plumbing, UTF-8, `dir=auto` free text and ltr technical/contact values. Exact Arabic storage/retrieval and actual process-restart checks passed.
 
@@ -27,7 +46,7 @@ The user's first-run delivery overrides broader completion gates. Root `AGENTS.m
 
 | Requirement | Status / dependency |
 |---|---|
-| Actual AI screening / AT-05 | Blocked on Omar's adapter/model. Contract fixtures are software tests, not screening. |
+| Actual AI screening / AT-05 | PASS for saved-model software integration: actual 14-group outputs stored as unconfirmed suggestions. Independent clinical evaluation/calibration and safety policy remain pending. |
 | Automated warning signs / AT-06 | Blocked on agreed structured inputs, persistence and Omar-supplied clinical policy. General emergency notice is not detection. |
 | Worker-assisted submission and durable submitting identity / AT-02 | Account identity is implemented; blocked on worker access grants and case attribution extension. Worker has no patient access now. |
 | Medical history / full UC-01, UC-07, UC-12 | Blocked on history extension. Current profile stores only existing Patient columns. |

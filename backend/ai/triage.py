@@ -1,14 +1,107 @@
-"""Limited prototype flags from explicitly supplied clinician-review examples.
+"""Small user-authorized prototype priority policy and legacy review flags.
 
-These rules are not validated emergency screening. They assign no diagnosis,
-priority or treatment, and an empty result does not establish that care is safe.
-Free text is intentionally not interpreted as structured clinical evidence.
+Neither policy is clinically validated or supplies diagnoses/treatment. Free text
+is never interpreted as structured evidence; routine never establishes safety.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from numbers import Integral
+import math
+from backend.i18n import translate
+
+# User-authorized illustrative policy, not validated clinical screening. A rule
+# matches only when every named structured answer is explicitly positive.
+SYMPTOM_RULES = (
+    ('emergency', ('other_symptoms_shortness_of_breath',), 'triage_breathing'),
+    ('urgent', ('rapidly_worsening',), 'triage_worsening'),
+    ('urgent', ('fever', 'discharge'), 'triage_fever_discharge'),
+)
+CONDITION_PRIORITIES = {
+    'Acne/Follicular': 'routine', 'Bacterial Infection': 'routine',
+    'Benign Lesion': 'routine', 'Dermatitis/Eczema': 'routine',
+    'Fungal Infection': 'routine', 'Hair/Nail Disorder': 'routine',
+    'Inflammatory/Autoimmune': 'routine', 'Malignancy/Precancer': 'urgent',
+    'Other': 'routine', 'Parasite/Bite': 'routine', 'Pigment Disorder': 'routine',
+    'Trauma/Wound': 'routine', 'Vascular/Purpura': 'routine', 'Viral Infection': 'routine',
+}
+PRIORITY_ORDER = {'routine': 0, 'urgent': 1, 'emergency': 2}
+DEFAULT_DEMO_THRESHOLD = 0.5  # Unvalidated uncertainty flag; never a severity cutoff.
+
+
+def triage_case(predictions, symptoms, *, uncertainty_threshold=DEFAULT_DEMO_THRESHOLD, locale='en'):
+    """Return deterministic prototype priority from ranked scores and structured flags.
+
+    Args:
+        predictions: Ranked dictionaries with condition/confidence, or None.
+            Only the first prediction may raise priority. Scanning every class
+            would flag virtually every case because a softmax lists all labels.
+        symptoms: Mapping of explicit integer/bool answers, retaining None for
+            unanswered values. Free text is never parsed.
+        uncertainty_threshold: Configurable, unvalidated top-score threshold
+            used only to require review, never to lower symptom-based priority.
+        locale: Small catalog locale used for persisted human-readable reasons.
+
+    Returns a JSON-compatible dictionary. Invalid inputs require manual review;
+    invalid policy thresholds raise ValueError instead of silently changing rules.
+    """
+    if type(uncertainty_threshold) not in (int, float) or not math.isfinite(uncertainty_threshold) or not 0 <= uncertainty_threshold <= 1:
+        raise ValueError('Invalid demo triage uncertainty threshold')
+    symptoms = symptoms if isinstance(symptoms, Mapping) else {}
+    reasons = []
+    level = 'routine'
+    required = {key for _, keys, _ in SYMPTOM_RULES for key in keys}
+    missing = any(not (isinstance(symptoms.get(key), Integral) and symptoms[key] in (0, 1)) for key in required)
+    manual = missing
+    for priority, keys, reason in SYMPTOM_RULES:
+        if all(_explicit_yes(symptoms.get(key)) for key in keys):
+            if PRIORITY_ORDER[priority] > PRIORITY_ORDER[level]:
+                level = priority
+            reasons.append(translate(reason, locale))
+    if missing:
+        reasons.append(translate('triage_missing_symptoms', locale))
+
+    valid = isinstance(predictions, (list, tuple)) and bool(predictions)
+    unknown = False
+    previous = 1.0
+    seen = set()
+    if valid:
+        for item in predictions:
+            if not isinstance(item, Mapping):
+                valid = False
+                break
+            name, score = item.get('condition'), item.get('confidence')
+            if not isinstance(name, str) or not name or name in seen:
+                valid = False
+                break
+            seen.add(name)
+            unknown = unknown or name not in CONDITION_PRIORITIES
+            if type(score) not in (int, float) or not math.isfinite(score) or not 0 <= score <= previous:
+                valid = False
+                break
+            previous = score
+    if not valid:
+        manual = True
+        reasons.append(translate('triage_invalid_model', locale))
+    else:
+        top = predictions[0]
+        # Confidence controls uncertainty only. Even an uncertain concerning
+        # suggestion can raise urgent, but cannot override emergency symptoms.
+        if CONDITION_PRIORITIES.get(top['condition']) == 'urgent':
+            if PRIORITY_ORDER[level] < PRIORITY_ORDER['urgent']:
+                level = 'urgent'
+            reasons.append(translate('triage_model_concern', locale, condition=top['condition']))
+        if top['confidence'] < uncertainty_threshold or top['condition'] == 'Other':
+            manual = True
+            reasons.append(translate('triage_uncertain', locale))
+        if unknown:
+            manual = True
+            reasons.append(translate('triage_unmapped', locale))
+    if not reasons:
+        reasons.append(translate('triage_no_rule', locale))
+    return {'triage_level': level, 'triage_reasons': reasons,
+            'needs_manual_review': manual, 'triage_method': 'rules_with_model_input'}
 
 
 def _explicit_yes(value: object) -> bool:

@@ -31,10 +31,10 @@ def csrf(page):
     return re.search(r'name="csrf" value="([a-f0-9]+)"', page)[1]
 
 
-def post(path, values, source='/login'):
+def post(path, values, source='/login', timeout=10):
     values = {**values, 'csrf':csrf(get(source))}
     data = urlencode(values, doseq=True).encode()
-    with http.open(BASE+path, data=data, timeout=10) as result:
+    with http.open(BASE+path, data=data, timeout=timeout) as result:
         return urlparse(result.url).path, result.read().decode('utf-8')
 
 
@@ -42,7 +42,8 @@ def login(username, password):
     return post('/login', {'username':username, 'password':password})
 
 
-def create(provider_username, provider_password):
+def create(provider_username, provider_password, *, analyze=False):
+    """Exercise native patient checkboxes; optionally invoke the actual selected saved model."""
     username = 'smoke-' + uuid.uuid4().hex[:12]
     patient_password = secrets.token_urlsafe(24)
     path, page = post('/patients/new', {'username':username, 'password':patient_password, 'password_confirm':patient_password,
@@ -60,7 +61,16 @@ def create(provider_username, provider_password):
     im.save(stream,format='PNG')
     boundary = 'smoke-'+uuid.uuid4().hex
     parts = []
-    for name,value in {'csrf':csrf(page),'chief_complaint':ARABIC,'duration_days':'7','itching':'','pain':'0','body_sites':'8','photo_body_site':'8','additional_notes':ARABIC,'intake_action':'submit','consent':'1'}.items():
+    from backend.preprocessing import SCINQuestionnaire
+    answers = {'csrf':csrf(page),'chief_complaint':ARABIC,'symptom_ui':'checkboxes-v1',
+               'symptoms_answered':'1','itching':'1','body_sites':'8','photo_body_site':'8',
+               'additional_notes':ARABIC,'intake_action':'submit','consent':'1',
+               'model_questionnaire_version':'1','model_textures_rough_or_flaky':'1',
+               'model_body_parts_palm':'1','model_other_symptoms_no_relevant_symptoms':'1',
+               'model_condition_duration':'ONE_TO_FOUR_WEEKS','model_related_category':'RASH',
+               'model_fitzpatrick_skin_type':'UNKNOWN'}
+    answers.update({'model_group_answered_'+group:'1' for group in SCINQuestionnaire.GROUPS})
+    for name,value in answers.items():
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
     for n in range(2):
         field_name = 'images' if n == 0 else 'camera'
@@ -75,6 +85,17 @@ def create(provider_username, provider_password):
     login(provider_username, provider_password)
     assert f'/cases/{case_id}' in get('/queue')
     post(f'/cases/{case_id}/transition',{'action':'claim'})
+    if analyze:
+        # All patient inputs already persist. Real browser FormData omits the
+        # disabled recorded answers and derived/read-only categorical values.
+        model_form = {'analysis_base':'0','model_questionnaire_version':'1',
+                      **{'model_group_answered_'+group:'1' for group in SCINQuestionnaire.GROUPS}}
+        _, model_page = post(f'/cases/{case_id}/analyze', model_form, f'/cases/{case_id}', timeout=100)
+        assert 'Latest AI result' in model_page
+        assert 'AI match score:' in model_page
+        assert '%</bdi>' in model_page
+        assert 'AI-assisted triage — prototype; clinician review required.' in model_page
+        print('PASS: real patient checkbox answers → saved model inference without clinician re-entry.')
     post(f'/cases/{case_id}/review', {'decision':'confirmed','triage_level':'undetermined','patient_message':ARABIC,
                                     'clinical_notes':'PRIVATE HTTP SMOKE NOTE','diagnosis_0':'Synthetic clinician documentation',
                                     'certainty_0':'provisional','primary':'0','instructions_0':'Synthetic treatment instructions',
@@ -84,6 +105,8 @@ def create(provider_username, provider_password):
     login(username, patient_password)
     page = get(f'/cases/{case_id}')
     assert ARABIC in page and 'Synthetic treatment instructions' in page and 'PRIVATE HTTP SMOKE NOTE' not in page
+    assert 'value="1" checked' not in page  # Submitted answers are read-only.
+    assert 'One to four weeks' in page
     image_id = int(re.search(r'<img src="/images/(\d+)"',page)[1])
     with http.open(BASE+f'/images/{image_id}') as response:
         digest = hashlib.sha256(response.read()).hexdigest()

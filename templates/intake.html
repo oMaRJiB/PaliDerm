@@ -1,4 +1,4 @@
-{% from 'macros.html' import token,text with context %}
+{% from 'macros.html' import token,text,model_questions with context %}
 <p>{{ t('intake_help') }}</p>
 <form class="intake-form" method="post" enctype="multipart/form-data" action="{{ url_for('save_intake',case_id=case.case_id) }}">
   {{ token() }}
@@ -6,19 +6,22 @@
     <h3 id="details-heading">{{ t('case_details') }}</h3>
     <div class="form-grid">
       {{ text('chief_complaint',case.chief_complaint,true) }}
-      {{ text('duration_days',case.duration_days if case.duration_days is not none else '',type='number') }}
+      {% if case.duration_days is not none %}<p>{{ t('recorded_duration_days') }}: <bdi dir="ltr">{{ case.duration_days }}</bdi></p>{% endif %}
     </div>
   </section>
-  <fieldset class="symptom-grid"><legend>{{ t('symptoms') }}</legend>
+  <fieldset><legend>{{ t('symptoms') }}</legend>
+    <input type="hidden" name="symptom_ui" value="checkboxes-v1">
+    <p>{{ t('checkbox_help') }}</p><div class="check-grid">
     {% for k in symptom_keys %}
-    <label>{{ t(k) }}<select name="{{ k }}">
-      {% for v,key in [('', 'unknown'),('0','no'),('1','yes')] %}
-      <option value="{{ v }}" {% if symptom and (symptom[k]|string if symptom[k] is not none else '') == v %}selected{% endif %}>{{ t(key) }}</option>
-      {% endfor %}
-    </select></label>
+    <label class="check-option"><input type="checkbox" name="{{ k }}" value="1"{% if symptom and symptom[k] == 1 %} checked{% endif %}><span>{{ t(k) }}{% if symptom and symptom[k] == 0 %}<small class="field-help"> {{ t('saved_no') }}</small>{% endif %}</span></label>
     {% endfor %}
+    </div>
+    <label class="group-confirm"><input type="checkbox" name="symptoms_answered" value="1"{% if symptoms_complete %} checked{% endif %}>{{ t('checkbox_complete') }}</label>
     <label class="full-row">{{ t('additional_notes') }}<textarea name="additional_notes" dir="auto">{{ symptom.additional_notes or '' if symptom else '' }}</textarea></label>
   </fieldset>
+  <section aria-labelledby="model-questions-heading"><h3 id="model-questions-heading">{{ t('patient_model_questions') }}</h3><p>{{ t('patient_model_help') }}</p>
+    {{ model_questions(patient_model_groups) }}
+  </section>
   <fieldset class="body-sites"><legend>{{ t('body_sites') }}</legend>
     {% for s in sites %}<label><input type="checkbox" name="body_sites" value="{{ s.body_site_id }}" {% if s.body_site_id in selected_sites %}checked{% endif %}>{{ t(s.site_name) }}</label>{% endfor %}
   </fieldset>

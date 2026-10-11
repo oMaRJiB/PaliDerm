@@ -1,12 +1,13 @@
 """CaseWorkflow owns clinical reads/writes, access checks and transactions."""
 from contextlib import nullcontext
 from datetime import date, datetime, timezone
+import json
 from flask import current_app
 from backend.db import get_db, transaction
 from backend.validation import Problem, now, required, calendar, integer, choice, role
 from backend.images import ImageStorage
 from backend.security import cipher, encrypt_text, reveal
-from backend.preprocessing import normalize_gender, symptom_answers
+from backend.preprocessing import normalize_gender, symptom_answers, SCINQuestionnaire
 from backend.ai.adapter import AnalysisInput, ImageInput, LesionInput
 
 SYMPTOMS = ('itching', 'pain', 'bleeding', 'discharge', 'fever', 'rapidly_worsening')
@@ -85,14 +86,27 @@ class CaseWorkflow:
     def save_draft(self, case_id, form, db=None):
         """Validate then encrypt questionnaire/sites; optional db joins an outer atomic intake transaction."""
         complaint = required(form.get('chief_complaint'))
-        duration = integer(form.get('duration_days'))
-        symptoms = symptom_answers(form)
         try:
             sites = {int(x) for x in form.getlist('body_sites')}
         except (ValueError, TypeError):
             raise Problem('invalid_choice') from None
         with (transaction() if db is None else nullcontext(db)) as db:
-            self.draft_access(case_id, db)
+            case = self.draft_access(case_id, db)
+            # Range answers have no honest exact-day conversion. Preserve legacy
+            # numeric durations unless a legacy client explicitly changes them.
+            duration = integer(form.get('duration_days')) if 'duration_days' in form else case['duration_days']
+            patient = self.patient_access(case['patient_id'], db)
+            previous = reveal('Symptom', db.execute('SELECT * FROM Symptom WHERE case_id=?', (case_id,)).fetchone())
+            symptoms = symptom_answers(form, previous)
+            extras = SCINQuestionnaire().patient_answers(
+                form, patient, symptoms, (previous or {}).get('model_metadata'),
+                datetime.now(timezone.utc).date())
+            if form.get('model_questionnaire_version') == '1' and extras.get('condition_duration'):
+                # An explicitly edited range replaces draft numeric duration; do
+                # not fabricate an exact day count from a broad training category.
+                duration = None
+            if extras:
+                symptoms['model_metadata'] = extras
             valid = {r[0] for r in db.execute('SELECT body_site_id FROM BodySite')}
             if not sites <= valid:
                 raise Problem('invalid_choice')
@@ -271,14 +285,15 @@ class CaseWorkflow:
             return review_id
 
     def build_analysis_input(self, case_id):
-        """Build the unchanged typed input from authorized decrypted records and verified original hashes."""
+        """Build typed input from authorized recorded answers/profile and verified original image hashes."""
         role(self.identity, 'provider')
         db = get_db()
         case = self.case_access(case_id, db)
         p = reveal('Patient', db.execute('SELECT * FROM Patient WHERE patient_id=?', (case['patient_id'],)).fetchone())
         age = None
+        reference = date.fromisoformat(case['submitted_at'][:10]) if case['submitted_at'] else datetime.now(timezone.utc).date()
         if p['date_of_birth']:
-            born, today = date.fromisoformat(p['date_of_birth']), datetime.now(timezone.utc).date()
+            born, today = date.fromisoformat(p['date_of_birth']), reference
             age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
         symptom = reveal('Symptom', db.execute('SELECT * FROM Symptom WHERE case_id=?', (case_id,)).fetchone())
         lesions = []
@@ -290,7 +305,21 @@ class CaseWorkflow:
             lesions.append(LesionInput(l['lesion_id'], l['site_name'], tuple(images)))
         return AnalysisInput('1.0', case_id, case['chief_complaint'], case['duration_days'], age, p['sex'],
                              {k: symptom[k] if symptom else None for k in (*SYMPTOMS, 'additional_notes')},
-                             tuple(lesions), case['submitted_at'])
+                             tuple(lesions), case['submitted_at'],
+                             self.model_answers(p, symptom, reference))
+
+    @staticmethod
+    def model_answers(patient, symptom, reference):
+        """Merge saved extras/known symptoms with server-derived profile categories.
+
+        Older questionnaires may have no extras. No absent binary answer becomes
+        zero, and age uses the submission date so historical inputs do not drift.
+        """
+        values = dict((symptom or {}).get('model_metadata') or {})
+        for name, key in SCINQuestionnaire.SYMPTOM_FIELDS.items():
+            values[name] = (symptom or {}).get(key)
+        values.update(SCINQuestionnaire.profile_values(patient, reference))
+        return values
 
     def profile(self, patient_id):
         """Return only the owning patient and decrypted case list for presentation."""
@@ -334,12 +363,27 @@ class CaseWorkflow:
         treatments = [reveal('TreatmentPlan', reveal('Diagnosis', row)) for row in treatments]
         analyses = db.execute('SELECT * FROM AIAnalysis WHERE case_id=? ORDER BY analysis_id DESC', (case_id,)).fetchall() if provider_view else []
         analyses = [reveal('AIAnalysis', row) for row in analyses]
+        for analysis in analyses:
+            # Legacy plain narrative strings remain unchanged. Decode only our
+            # encrypted versioned output envelope, never the submitted snapshot.
+            try:
+                envelope = json.loads(analysis['rationale'] or '')
+            except (ValueError, TypeError):
+                continue
+            if isinstance(envelope, dict) and envelope.get('format') == 'paliderm-triage-v1':
+                analysis['rationale'] = envelope['rationale']
+                analysis['assisted_triage'] = envelope['triage']
         latest_success = next((a for a in analyses if a['status'] == 'completed'), None)
         candidates = db.execute('SELECT * FROM AICandidate WHERE analysis_id=? ORDER BY rank', (latest_success['analysis_id'],)).fetchall() if latest_success else []
         candidates = [reveal('AICandidate', row) for row in candidates]
+        reference = date.fromisoformat(case['submitted_at'][:10]) if case['submitted_at'] else datetime.now(timezone.utc).date()
+        model_answers = self.model_answers(patient, symptom, reference)
         return {'case': case,
                 'patient': patient,
                 'symptom': symptom,
+                'symptoms_complete': bool(symptom) and all(symptom.get(key) in (0, 1) for key in SYMPTOMS),
+                'model_answers': model_answers,
+                'patient_model_groups': SCINQuestionnaire().fields(model_answers, patient=True),
                 'lesions': lesions,
                 'images': images,
                 'sites': db.execute('SELECT * FROM BodySite ORDER BY body_site_id').fetchall(),

@@ -2,7 +2,10 @@
 import hashlib
 import io
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import closing
@@ -11,7 +14,7 @@ from unittest.mock import patch
 from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash
 from app import create_app
-from backend.db import ROOT, connect, _apply_auth, get_db
+from backend.db import ROOT, connect, _apply_auth, get_db, initialize
 from backend.images import ImageStorage
 from backend.migrate_encryption import migrate
 from backend.preprocessing import gender_one_hot, normalize_gender, symptom_vector
@@ -216,6 +219,136 @@ class EncryptionMigrationTests(unittest.TestCase):
         with self.assertRaises(EncryptionError):
             create_app({'DATABASE':str(dest/'demo.sqlite3'),'UPLOAD_DIR':str(dest/'uploads'),
                         'ENCRYPTION_KEY':Fernet.generate_key().decode(),'ENCRYPTION_KEY_FILE':None})
+
+    def test_failed_fresh_initialization_is_retryable_without_copy_migration(self):
+        """A failed new setup may remove its own partial file, never an existing DB."""
+        fresh=self.root/'fresh.sqlite3'
+        with patch('backend.db.apply_encryption_schema',side_effect=RuntimeError('Synthetic setup failure')):
+            with self.assertRaisesRegex(RuntimeError,'Synthetic setup failure'):
+                initialize(fresh,self.key)
+        self.assertFalse(fresh.exists())
+        initialize(fresh,self.key)
+        with closing(connect(fresh)) as db:
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],4)
+        before=fresh.read_bytes()
+        with self.assertRaises(EncryptionError):
+            initialize(fresh,Cipher(Fernet.generate_key()))
+        self.assertEqual(fresh.read_bytes(),before)
+
+    def test_existing_destination_cli_reports_launch_guidance_without_overwrite(self):
+        """An already migrated target is preserved and explained rather than retried."""
+        destination=self.root/'already-encrypted'
+        migrate(self.source,self.uploads,destination,self.key)
+        before=(destination/'demo.sqlite3').read_bytes()
+        environment={**os.environ,'ENCRYPTION_KEY':self.key_value.decode('ascii')}
+        environment.pop('ENCRYPTION_KEY_FILE',None)
+        result=subprocess.run(
+            [sys.executable,'-m','backend.migrate_encryption','--source-db',str(self.source),
+             '--source-uploads',str(self.uploads),'--destination',str(destination)],
+            capture_output=True,text=True,env=environment,check=False,
+        )
+        self.assertEqual(result.returncode,1)
+        self.assertIn('Destination already exists',result.stderr)
+        self.assertIn('launch the encrypted dataset',result.stderr)
+        self.assertNotIn('Traceback',result.stderr)
+        self.assertEqual((destination/'demo.sqlite3').read_bytes(),before)
+        self.assertEqual(self.source.read_bytes(),self.original)
+
+    def test_default_startup_uses_migrated_storage_preserving_plaintext_sources(self):
+        """Bare Flask startup must select the encrypted copy, with an explicit key."""
+        destination=self.root/'instance'/'encrypted'
+        migrate(self.source,self.uploads,destination,self.key)
+        legacy=self.root/'instance'/'demo.sqlite3'
+        legacy.write_bytes(self.original)
+        encrypted_before=(destination/'demo.sqlite3').read_bytes()
+        settings={'TESTING':True,'SECRET_KEY':'synthetic-test','ENCRYPTION_KEY':self.key_value}
+        # Ignore operator shell paths/keys; all selected storage remains temporary.
+        with patch('app.ROOT',self.root),patch.dict(os.environ,{},clear=True):
+            application=create_app(settings)
+            self.assertEqual(Path(application.config['DATABASE']),(destination/'demo.sqlite3').resolve())
+            self.assertEqual(Path(application.config['UPLOAD_DIR']),(destination/'uploads').resolve())
+            self.assertEqual(application.test_client().get('/login').status_code,200)
+            with self.assertRaises(EncryptionError):
+                create_app({**settings,'ENCRYPTION_KEY':Fernet.generate_key()})
+            with self.assertRaisesRegex(RuntimeError,'v3'):
+                create_app({**settings,'DATABASE':str(legacy)})
+        self.assertEqual(legacy.read_bytes(),self.original)
+        self.assertEqual(self.source.read_bytes(),self.original)
+        self.assertEqual((self.uploads/self.storage_id).read_bytes(),png().getvalue())
+        self.assertEqual((destination/'demo.sqlite3').read_bytes(),encrypted_before)
+
+    def test_default_startup_does_not_hide_unmigrated_records_or_generate_a_key(self):
+        """Missing migrated storage must not create an empty replacement for legacy data."""
+        legacy=self.root/'instance'/'demo.sqlite3'
+        legacy.parent.mkdir()
+        legacy.write_bytes(self.original)
+        with patch('app.ROOT',self.root),patch.dict(os.environ,{},clear=True):
+            with self.assertRaisesRegex(RuntimeError,'migrat'):
+                create_app({'TESTING':True,'SECRET_KEY':'synthetic-test','ENCRYPTION_KEY':self.key_value})
+        self.assertEqual(legacy.read_bytes(),self.original)
+        self.assertFalse((legacy.parent/'encrypted'/'demo.sqlite3').exists())
+        empty_root=self.root/'fresh-start'
+        empty_root.mkdir()
+        with patch('app.ROOT',empty_root),patch.dict(os.environ,{},clear=True):
+            with self.assertRaises(EncryptionError):
+                create_app({'TESTING':True,'SECRET_KEY':'synthetic-test'})
+        self.assertFalse((empty_root/'instance'/'encryption.key').exists())
+        self.assertFalse((empty_root/'instance'/'encrypted'/'demo.sqlite3').exists())
+
+    def test_duplicate_image_references_preserve_rows_with_one_encrypted_file(self):
+        """Several SQL image records may legitimately reference the same source object."""
+        with closing(connect(self.source)) as db:
+            db.execute('INSERT INTO LesionImage(lesion_id,image_uri,mime_type,content_sha256) '
+                       'SELECT lesion_id,image_uri,mime_type,content_sha256 FROM LesionImage')
+            db.commit()
+        original=self.source.read_bytes()
+        destination=self.root/'duplicate-images'
+        report=migrate(self.source,self.uploads,destination,self.key)
+        self.assertEqual(report['images'],2)
+        with closing(connect(destination/'demo.sqlite3')) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM LesionImage').fetchone()[0],2)
+            self.assertEqual(db.execute('SELECT count(DISTINCT image_uri) FROM LesionImage').fetchone()[0],1)
+        self.assertEqual(len(list((destination/'uploads').iterdir())),1)
+        storage=ImageStorage({'UPLOAD_DIR':destination/'uploads','MAX_IMAGE_BYTES':1024*1024,
+                              'MAX_IMAGE_COUNT':12},self.key)
+        self.assertEqual(storage.read_original(self.storage_id),png().getvalue())
+        self.assertEqual(self.source.read_bytes(),original)
+
+    def test_duplicate_image_reference_with_inconsistent_hash_publishes_nothing(self):
+        """Deduplicating files must never conceal contradictory SQL content hashes."""
+        with closing(connect(self.source)) as db:
+            db.execute('INSERT INTO LesionImage(lesion_id,image_uri,mime_type,content_sha256) '
+                       "SELECT lesion_id,image_uri,mime_type,? FROM LesionImage",('0'*64,))
+            db.commit()
+        original=self.source.read_bytes()
+        destination=self.root/'inconsistent-images'
+        with self.assertRaises(RuntimeError):
+            migrate(self.source,self.uploads,destination,self.key)
+        self.assertEqual(self.source.read_bytes(),original)
+        self.assertFalse(destination.exists())
+        self.assertEqual(list(self.root.glob('.encryption-stage-*')),[])
+
+    def test_invalid_image_identifier_has_controlled_actionable_cli_failure(self):
+        """A legacy URI outside the storage contract must not escape as an HTTP error."""
+        with closing(connect(self.source)) as db:
+            db.execute("UPDATE LesionImage SET image_uri='../synthetic-invalid.png'")
+            db.commit()
+        original=self.source.read_bytes()
+        destination=self.root/'invalid-image'
+        with self.assertRaisesRegex(RuntimeError,'image|storage'):
+            migrate(self.source,self.uploads,destination,self.key)
+        environment={**os.environ,'ENCRYPTION_KEY':self.key_value.decode('ascii')}
+        environment.pop('ENCRYPTION_KEY_FILE',None)
+        command=[sys.executable,'-m','backend.migrate_encryption','--source-db',str(self.source),
+                 '--source-uploads',str(self.uploads),'--destination',str(destination)]
+        result=subprocess.run(command,capture_output=True,text=True,env=environment,check=False)
+        self.assertEqual(result.returncode,1)
+        self.assertNotIn('Traceback',result.stderr)
+        self.assertIn('Migration failed',result.stderr)
+        self.assertRegex(result.stderr.lower(),'image|storage')
+        self.assertEqual(self.source.read_bytes(),original)
+        self.assertFalse(destination.exists())
+        self.assertEqual(list(self.root.glob('.encryption-stage-*')),[])
 
 
 if __name__=='__main__':
