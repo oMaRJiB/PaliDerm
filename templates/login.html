@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% from 'macros.html' import token with context %}{% block content %}
 <h2>{{ t('login') }}</h2>
 <form class="auth-form" method="post">{{ token() }}
-<label>{{ t('username') }}<input name="username" dir="ltr" autocomplete="username" required maxlength="64"></label>
+<label>{{ t('username') }}<input name="username" dir="ltr" lang="en" autocomplete="username" required maxlength="64" pattern="[A-Za-z0-9._-]{3,64}"></label>
 <label>{{ t('password') }}<input type="password" name="password" dir="auto" autocomplete="current-password" required maxlength="256"></label>
 <button>{{ t('login') }}</button></form>
 <a href="{{ url_for('register') }}">{{ t('register') }}</a>{% endblock %}

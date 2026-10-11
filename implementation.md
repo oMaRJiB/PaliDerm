@@ -1,5 +1,26 @@
 # Reconciled implementation decisions
 
+## PaliDerm English/Arabic delivery update — 2026-10-11
+
+Brand the current app PaliDerm with black/white/green/red accents. Remove the word
+prototype from visible app text while retaining the user's requested disclaimer,
+AI clinician-review requirement and general emergency guidance. Preserve historical
+technical documentation and the existing clinical/security limitations.
+
+The complete centralized Arabic label catalog and browser English/Arabic selector
+are authorized now. Locale is signed-session presentation state, preserved through
+login/logout and app restarts, with CSRF and safe local redirects. RTL layout uses
+logical CSS; dates format in the chosen interface language and device timezone.
+Translate known model output labels/narratives for presentation without changing
+stored English labels, probabilities, rules or encrypted clinical history. Patient
+and clinician-authored free text is not automatically translated.
+
+Names/complaints/notes support exact Arabic or English. The user confirmed Latin
+usernames/emails and telephone 0–9 digits only; validate these server-side and in
+native forms, keeping their direction LTR. Passwords may use either language. No
+schema migration or model/notebook changes. Full visual Arabic/device/accessibility
+verification remains distinct from catalog, HTTP, JavaScript and persistence tests.
+
 ## Minimal prototype triage and local reset — 2026-10-11
 
 The user's latest request authorizes only the existing-model rule layer and demo reset; no notebook/model/training changes. The saved SCIN bridge calls deterministic triage_case after inference. Structured shortness of breath raises emergency; rapid worsening or fever with discharge raises urgent; only top-ranked Malignancy/Precancer raises model-based urgent. All other actual supported labels have routine mappings, never lowering symptom urgency. Missing/invalid inputs, unmapped labels, Other or top score below configurable AI_TRIAGE_DEMO_THRESHOLD=0.5 require manual review. Threshold and rules are illustrative/unvalidated, not treatment guidance or full AT-06 validation.

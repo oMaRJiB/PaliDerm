@@ -1,3 +1,58 @@
+# PaliDerm branding and Arabic interface — 2026-10-11
+
+This update supersedes earlier Arabic-translation-pending statements below;
+historical checks and individual AT-01 through AT-12 results are preserved.
+Visible app wording now uses PaliDerm without “prototype”. The synthetic-use,
+clinical-validation and response-time disclaimer remains, together with emergency
+guidance and required clinician review, in both languages. No model, notebook,
+training artifact, database schema, clinical policy or dependency was changed.
+
+- `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_localization test_presentation test_triage test_ai_runner test_workflow test_auth test_encryption test_intake test_local_model_adapter -q`:
+  **100 tests PASS in 34.677s**. Eight localization tests cover complete matching
+  348-key EN/AR catalogs and placeholders, CSRF/safe locale redirects, session and
+  language retention, Arabic patient/clinician pages, technical-field validation,
+  exact encrypted Arabic text after restart, unchanged stored English identifiers,
+  and display-only translation of current/historical AI labels and narratives.
+  Existing ownership, image, encryption, intake, triage, AI and review tests pass.
+- `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg MPLCONFIGDIR=.cache/matplotlib TF_CPP_MIN_LOG_LEVEL=3 TF_NUM_INTEROP_THREADS=1 TF_NUM_INTRAOP_THREADS=1 .venv/bin/python -B tests/live_smoke.py --with-model`:
+  **PASS** with approved loopback access. Actual HTTP signup/login/intake, two
+  images, consent, assignment, existing saved-model inference, Arabic RTL report
+  and English switching, review/treatment/referral and patient release passed.
+  An actual child-process restart preserved encrypted answers, predictions,
+  triage, exact Arabic clinical text and identical image bytes. The disclaimer
+  remains present and reports contain no visible “prototype” wording. Temporary
+  synthetic test records only; normal demo records were untouched.
+- `tests/forms_smoke.mjs` executed in the Node runtime: **PASS** for timestamp
+  UTC parsing/device-timezone/DST behavior, named-action assignment, form error
+  recovery/retry/duplicate prevention, navigation, close confirmation and image
+  previews/removal. These use DOM doubles, not a real browser. Native HTML pattern
+  checks accept Latin email/phone examples and reject Arabic email/phone digits.
+- CSS checks passed; primary green/white contrast is **7.36:1**. Green, black,
+  white and restrained red accents retain labeled clinical priority distinctions.
+- The active server was restarted with preserved data/key on **127.0.0.1:5000**,
+  background PID **9580**, debug off. A read-only HTTP login/language-switch check
+  passed against that server. `git diff --check` passed. No deployment or push.
+
+Only usernames/email addresses and phone digits require Latin/0–9 characters.
+Names, passwords and authored clinical text support Unicode; user text is never
+automatically translated or rewritten. Stored schema/API/enums/model labels remain
+English; known generated labels/notices are translated only when displayed.
+Language selection is available before and after login and works without JavaScript.
+
+Remaining limitations: real browser/device Arabic RTL, keyboard, screen-reader and
+camera visual/hardware verification are **NOT RUN** because Computer Use access
+was unavailable. Complete Arabic support and clinical validation are not claimed.
+Worker access/attribution, medical history, durable submission revisions and
+production hardening remain pending as documented in earlier acceptance tracking.
+
+Files changed: `AGENTS.md`, `implementation.md`, `README.md`,
+`docs/TEST_RESULTS.md`, `app.py`, `backend/auth.py`, `backend/i18n.py`,
+`backend/services.py`, `backend/validation.py`, `static/app.css`,
+`static/forms.js`, `templates/base.html`, `templates/case.html`,
+`templates/login.html`, `templates/macros.html`, `templates/register.html`,
+`tests/http_smoke.py`, `tests/test_triage.py`, `tests/test_workflow.py`,
+`tests/test_localization.py`.
+
 # Minimal UI tidy-up and device-local times — 2026-10-11
 
 Shared CSS now gives pages a restrained white surface, cleaner spacing, softer

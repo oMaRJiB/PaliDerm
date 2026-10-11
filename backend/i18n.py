@@ -1,6 +1,9 @@
-"""Small English catalog. Arabic locale plumbing exists; translations are pending."""
+"""Small English/Arabic UI catalog; stored field names and clinical data stay unchanged."""
+import re
+
+
 EN = {
-    'assisted_triage_notice': 'AI-assisted triage — prototype; clinician review required.',
+    'assisted_triage_notice': 'AI-assisted triage — clinician review required.',
     'triage_manual': 'Priority undetermined — manual review needed',
     'triage_emergency': 'Emergency', 'triage_urgent': 'Urgent', 'triage_routine': 'Routine',
     'triage_breathing': 'Shortness of breath reported.',
@@ -43,15 +46,20 @@ EN = {
     'patient_home': 'Create a draft, add symptoms and photographs, then submit it for clinician review. Your saved cases and released outcomes are available in My cases.',
     'provider_home': 'Open the clinician queue to review submitted cases and publish patient outcomes. Review remains available without AI.',
 
-    'app_title': 'Teledermatology local prototype',
+    'app_title': 'PaliDerm',
     'prototype': 'Synthetic demonstration only. Not clinically validated. No guaranteed response time.',
-    'emergency': 'This prototype is not an emergency service. If you believe you have a medical emergency, seek immediate local emergency care. Do not wait for photographs, AI, or a review.',
+    'emergency': 'PaliDerm is not an emergency service. If you believe you have a medical emergency, seek immediate local emergency care. Do not wait for photographs, AI, or a review.',
+    'language': 'Language', 'language_english': 'English', 'language_arabic': 'العربية',
+    'language_changed': 'Language updated.',
+    'english_only_help': 'Usernames and email addresses use English letters. Phone numbers use 0–9.',
+    'invalid_email': 'Enter an email address using English letters, numbers and standard email symbols.',
+    'invalid_phone': 'Enter a telephone number using 0–9; +, spaces, parentheses and hyphens are allowed.',
     'home': 'Home', 'login': 'Log in', 'logout': 'Sign out',
     'navigation': 'Main navigation', 'my_cases': 'My cases',
     'home_help': 'Use the navigation to sign up, log in, and access your authorized cases. Use fictional data only.',
     'username': 'Username', 'password': 'Password', 'password_confirm': 'Confirm password',
-    'signup_help': 'Signup creates a patient account. Use a 3–64 character username (letters, numbers, dot, underscore or hyphen) and a 12–256 character password. Clinician and worker accounts are provisioned separately.',
-    'invalid_username': 'Username must have 3–64 ASCII letters, numbers, dots, underscores or hyphens.',
+    'signup_help': 'Signup creates a patient account. Use a 3–64 character username (English letters, numbers, dot, underscore or hyphen) and a 12–256 character password. Clinician and worker accounts are provisioned separately.',
+    'invalid_username': 'Username must have 3–64 English letters, numbers, dots, underscores or hyphens.',
     'invalid_password': 'Password must have 12–256 characters and cannot consist only of whitespace.',
     'password_mismatch': 'Passwords do not match.',
     'duplicate_signup': 'That username is unavailable. Choose another username or log in.',
@@ -72,7 +80,7 @@ EN = {
     'upload': 'Upload images', 'images': 'Images', 'image': 'Case image',
     'image_help': 'Take a photo or choose JPEG/PNG files. Up to {count} photos per case, {mb} MB each. Original image metadata is retained when present.',
     'image_quality': 'Image quality', 'unassessed': 'Unassessed', 'acceptable': 'Acceptable', 'poor': 'Poor — further review needed',
-    'consent': 'I consent to submitting these fictional case details and photographs for clinician review in this local prototype. This is not permission for AI training.',
+    'consent': 'I consent to submitting these fictional case details and photographs for clinician review in PaliDerm. This is not permission for AI training.',
     'consent_record': 'Submission consent', 'submit': 'Submit case', 'submitted_notice': 'Case submitted for clinician review.',
     'save_draft': 'Save draft details', 'case': 'Case', 'status': 'Lifecycle status', 'draft': 'Draft',
     'submitted': 'Pending Review (submitted)', 'in_review': 'In Review', 'needs_information': 'Additional Information Required',
@@ -120,7 +128,12 @@ EN = {
     'ai_model_unavailable': 'The configured local model is unavailable. Check its saved artifacts and inference dependencies. Manual review remains available.',
     'ai_local_summary': 'The AI compared the case with {count} groups of skin conditions.',
     'ai_local_rationale': 'Suggestions combine the photos and questionnaire answers. When there are several photos, their results are combined.',
-    'ai_local_limitations': 'This prototype can be wrong. It does not check photo quality or interpret written notes. Extra answers entered by a clinician are saved with this analysis only.',
+    'ai_local_limitations': 'AI can be wrong. It does not check photo quality or interpret written notes. Extra answers entered by a clinician are saved with this analysis only.',
+    'ai_warning_output': 'The result format was inferred. A clinician must review the suggestions.',
+    'ai_warning_objective': 'The saved model lacks some result settings. A clinician must review the suggestions.',
+    'ai_warning_images': 'Some photo-processing settings were missing; standard settings were used.',
+    'ai_warning_classes': 'Condition names are unavailable. Shown identifiers are not diagnoses.',
+    'ai_warning_text': 'Only structured answers are used by the AI; written notes are not interpreted.',
     # Saved SCIN feature/category names remain stable; only their labels are translated.
     'scin_group_textures': 'Skin appearance and texture',
     'scin_group_body': 'Affected body areas',
@@ -198,7 +211,7 @@ EN = {
     'pending': 'Pending', 'running': 'Running', 'completed': 'Completed', 'failed': 'Failed',
     'worker_blocked': 'Worker-assisted submission is pending patient access-grant and submitting-user schema extensions. This worker account cannot access patient records or publish decisions.',
     'resubmit_blocked': 'Your clinician requested additional information. Resubmission is pending a durable submission-revision schema extension; submitted content is protected from editing. Use the clinician’s external contact process for this demo.',
-    'arabic_pending': 'Arabic translations and full RTL verification are pending. This preview uses English labels.',
+    'arabic_pending': 'Arabic interface available. Names and clinical notes can be entered in Arabic or English.',
     'empty': 'None', 'error': 'Request could not be completed', 'return': 'Return to previous form',
     'required': 'Complete all required values; blank or whitespace-only values are not allowed.',
     'invalid_date': 'Enter a real calendar date in YYYY-MM-DD format; date of birth cannot be in the future.',
@@ -216,11 +229,261 @@ EN = {
     'referral_validation': 'A referral decision requires referral enabled, a destination, and a nonblank reason. Uncheck referral to omit it.',
     'conflict': 'Another action changed this case. Reload before publishing.',
     'storage': 'Storage or database operation failed. No partial review was published. Reload and retry.',
-    'too_large': 'Upload request exceeds the configured size limit.', 'local_only': 'This prototype is restricted to the loopback interface.',
+    'too_large': 'Upload request exceeds the configured size limit.', 'local_only': 'PaliDerm is restricted to this device’s local connection.',
     'unsupported': 'This operation is pending a documented schema extension.',
     'quality_warning': 'Check photo quality before making a decision.',
 }
-CATALOG = {'en': EN, 'ar': {}}
+AR = {
+    'assisted_triage_notice': 'تحديد الأولوية بمساعدة الذكاء الاصطناعي — مراجعة الطبيب مطلوبة.',
+    'triage_manual': 'الأولوية غير محددة — يلزم تقييم الطبيب',
+    'triage_emergency': 'طارئ', 'triage_urgent': 'عاجل', 'triage_routine': 'اعتيادي',
+    'triage_breathing': 'تم الإبلاغ عن ضيق في التنفس.',
+    'triage_worsening': 'الأعراض تتفاقم بسرعة.',
+    'triage_fever_discharge': 'تم الإبلاغ عن حمى وإفرازات.',
+    'triage_missing_symptoms': 'بعض الإجابات عن الأعراض ناقصة أو غير واضحة.',
+    'triage_invalid_model': 'نتائج الذكاء الاصطناعي غير متاحة أو تعذرت قراءتها.',
+    'triage_model_concern': 'الاحتمال الأول الذي اقترحه الذكاء الاصطناعي، {condition}، يحتاج إلى مراجعة عاجلة.',
+    'triage_uncertain': 'لم يتمكن الذكاء الاصطناعي من تقديم اقتراح واضح.',
+    'triage_unmapped': 'اقترح الذكاء الاصطناعي حالة لا تغطيها قواعد تحديد الأولوية.',
+    'triage_no_rule': 'لم يتم الإبلاغ عن علامات التحذير المدرجة. تظل مراجعة الطبيب مطلوبة.',
+    'triage_review_required': 'يلزم تقييم الطبيب.',
+    'gender_female': 'أنثى', 'gender_male': 'ذكر',
+    'gender_unknown': 'غير معروف / أفضل عدم الإفصاح',
+    'invalid_gender': 'اختر أنثى أو ذكر أو غير معروف / أفضل عدم الإفصاح.',
+    'case_details': 'تفاصيل الحالة', 'created_at': 'تاريخ الإنشاء',
+    'utc_time': 'التوقيت العالمي المنسق', 'time_local_notice': 'تُعرض الأوقات حسب المنطقة الزمنية لجهازك.',
+    'intake_help': 'أكمل الأقسام التالية، ثم احفظ المسودة أو أرسل الحالة لمراجعة الطبيب. يمكنك التمرير عبر النموذج بالكامل.',
+    'photos_section': 'الصور', 'choose_photos': 'اختيار صور موجودة',
+    'phone_camera': 'التقاط صورة بكاميرا الهاتف',
+    'camera_help': 'يعتمد التصوير بالهاتف على المتصفح. يمكنك أيضًا استخدام الكاميرا المباشرة أو اختيار صور موجودة.',
+    'camera_start': 'استخدام الكاميرا المباشرة', 'camera_capture': 'التقاط صورة', 'camera_stop': 'إيقاف الكاميرا',
+    'camera_denied': 'تعذر فتح الكاميرا. تحقق من إذن المتصفح أو استخدم كاميرا الهاتف أو اختيار الملفات.',
+    'camera_capture_error': 'تعذر التقاط الصورة. حاول مجددًا أو استخدم كاميرا الهاتف أو اختيار الملفات.',
+    'camera_ready': 'الكاميرا جاهزة. التقط الصورة عندما تظهر المنطقة المصابة بوضوح.',
+    'camera_taken': 'تم التقاط الصورة واختيارها أدناه. لم يتم رفعها بعد.',
+    'camera_video': 'معاينة الكاميرا المباشرة', 'camera_file': 'camera-photo.jpg',
+    'photo_body_site': 'موضع الجسم لهذه الصور الجديدة',
+    'photo_site': 'اختر موضعًا مصابًا أعلاه، ثم اختر الموضع نفسه للصور الجديدة.',
+    'draft_saved': 'تم حفظ المسودة. لم يتم إرسالها إلى الطبيب بعد.',
+    'submission_section': 'الموافقة والإرسال',
+    'skip_content': 'الانتقال إلى المحتوى الرئيسي',
+    'working': 'جارٍ الإرسال… يرجى انتظار استجابة الخادم.',
+    'network_error': 'انقطع الاتصال. ما زالت بيانات النموذج هنا. أعد تحميل الحالة للتحقق من اكتمال الإجراء قبل إعادة المحاولة.',
+    'remove_selection': 'إزالة الصورة المختارة',
+    'selected_preview': 'معاينة الصورة المختارة',
+    'preview_unavailable': 'المعاينة غير متاحة. سيتحقق الخادم من الملف عند رفعه.',
+    'confirm_close': 'هل تريد إغلاق هذه الحالة التي تمت مراجعتها؟ ستظل تعديلات المريض غير متاحة.',
+    'patient_home': 'أنشئ مسودة وأضف الأعراض والصور، ثم أرسلها لمراجعة الطبيب. ستجد الحالات المحفوظة والنتائج التي أصدرها الطبيب في «حالاتي».',
+    'provider_home': 'افتح قائمة الحالات لمراجعة الحالات المرسلة وإصدار النتائج للمرضى. المراجعة متاحة حتى دون الذكاء الاصطناعي.',
+    'app_title': 'PaliDerm',
+    'prototype': 'عرض توضيحي ببيانات وهمية فقط. لم يُعتمد سريريًا. لا يوجد وقت استجابة مضمون.',
+    'emergency': 'PaliDerm ليس خدمة طوارئ. إذا كنت تعتقد أن لديك حالة طبية طارئة، اطلب رعاية الطوارئ المحلية فورًا. لا تنتظر الصور أو الذكاء الاصطناعي أو المراجعة.',
+    'language': 'اللغة', 'language_english': 'English', 'language_arabic': 'العربية',
+    'language_changed': 'تم تغيير اللغة.',
+    'english_only_help': 'استخدم الحروف الإنجليزية لاسم المستخدم والبريد الإلكتروني، والأرقام 0–9 لرقم الهاتف.',
+    'invalid_email': 'أدخل بريدًا إلكترونيًا بالحروف الإنجليزية والأرقام ورموز البريد الإلكتروني المعتادة.',
+    'invalid_phone': 'أدخل رقم الهاتف بالأرقام 0–9. يُسمح بعلامة + والمسافات والأقواس والشرطات.',
+    'home': 'الرئيسية', 'login': 'تسجيل الدخول', 'logout': 'تسجيل الخروج',
+    'navigation': 'التنقل الرئيسي', 'my_cases': 'حالاتي',
+    'home_help': 'استخدم قائمة التنقل لإنشاء حساب أو تسجيل الدخول والوصول إلى الحالات المسموح لك بها. استخدم بيانات وهمية فقط.',
+    'username': 'اسم المستخدم', 'password': 'كلمة المرور', 'password_confirm': 'تأكيد كلمة المرور',
+    'signup_help': 'إنشاء الحساب مخصص للمرضى. اختر اسم مستخدم من 3 إلى 64 حرفًا إنجليزيًا أو رقمًا أو نقطة أو شرطة سفلية أو شرطة، وكلمة مرور من 12 إلى 256 حرفًا. تُنشأ حسابات الأطباء والعاملين الصحيين بشكل منفصل.',
+    'invalid_username': 'يجب أن يتكون اسم المستخدم من 3 إلى 64 حرفًا إنجليزيًا أو رقمًا أو نقطة أو شرطة سفلية أو شرطة.',
+    'invalid_password': 'يجب أن تتكون كلمة المرور من 12 إلى 256 حرفًا، وألا تتكون من مسافات فقط.',
+    'password_mismatch': 'كلمتا المرور غير متطابقتين.',
+    'duplicate_signup': 'اسم المستخدم غير متاح. اختر اسمًا آخر أو سجّل الدخول.',
+    'invalid_login': 'اسم المستخدم أو كلمة المرور غير صحيحة.',
+    'account_link': 'تعذر إنشاء الحساب. تحقق من تفرّد اسم المستخدم والدور والارتباط بسجل المريض أو الطبيب.',
+    'already_signed_in': 'سجّل الخروج قبل إنشاء حساب مريض آخر.',
+    'identity': 'الحساب', 'patient': 'مريض', 'provider': 'طبيب', 'worker': 'عامل صحي',
+    'register': 'إنشاء حساب مريض', 'first_name': 'الاسم الأول', 'last_name': 'اسم العائلة',
+    'date_of_birth': 'تاريخ الميلاد', 'sex': 'الجنس عند الولادة', 'phone': 'رقم الهاتف', 'email': 'البريد الإلكتروني',
+    'save': 'حفظ', 'profile': 'ملف المريض', 'profiles': 'ملفات المرضى', 'cases': 'الحالات',
+    'new_case': 'إنشاء مسودة حالة', 'chief_complaint': 'الشكوى الرئيسية', 'duration_days': 'المدة بالأيام (اتركها فارغة إن كانت غير معروفة)',
+    'additional_notes': 'ملاحظات إضافية عن الأعراض', 'symptoms': 'استبيان الأعراض',
+    'itching': 'حكة', 'pain': 'ألم', 'bleeding': 'نزيف', 'discharge': 'إفرازات',
+    'fever': 'حمى', 'rapidly_worsening': 'تفاقم سريع', 'unknown': 'غير معروف / بلا إجابة',
+    'yes': 'نعم', 'no': 'لا', 'body_sites': 'مواضع الجسم المصابة', 'body_site': 'موضع الجسم',
+    'scalp': 'فروة الرأس', 'face': 'الوجه', 'neck': 'الرقبة', 'chest': 'الصدر', 'abdomen': 'البطن',
+    'back': 'الظهر', 'arm': 'الذراع', 'hand': 'اليد', 'leg': 'الساق', 'foot': 'القدم', 'groin': 'الأربية', 'other': 'أخرى',
+    'upload': 'رفع الصور', 'images': 'الصور', 'image': 'صورة الحالة',
+    'image_help': 'التقط صورة أو اختر ملفات JPEG/PNG. الحد الأقصى {count} صور لكل حالة، وحجم كل صورة {mb} ميغابايت. تُحفظ البيانات الوصفية الأصلية للصورة إن وجدت.',
+    'image_quality': 'جودة الصورة', 'unassessed': 'لم تُقيّم', 'acceptable': 'مقبولة', 'poor': 'ضعيفة — تحتاج إلى مراجعة إضافية',
+    'consent': 'أوافق على إرسال تفاصيل هذه الحالة الوهمية وصورها لمراجعة الطبيب في PaliDerm. هذه الموافقة لا تسمح بتدريب الذكاء الاصطناعي عليها.',
+    'consent_record': 'الموافقة على الإرسال', 'submit': 'إرسال الحالة', 'submitted_notice': 'تم إرسال الحالة لمراجعة الطبيب.',
+    'save_draft': 'حفظ تفاصيل المسودة', 'case': 'الحالة', 'status': 'حالة الطلب', 'draft': 'مسودة',
+    'submitted': 'بانتظار المراجعة (تم الإرسال)', 'in_review': 'قيد المراجعة', 'needs_information': 'معلومات إضافية مطلوبة',
+    'reviewed': 'مكتملة (تمت المراجعة)', 'closed': 'مكتملة (مغلقة)', 'queue': 'قائمة الحالات للطبيب',
+    'assigned': 'الطبيب المسؤول', 'unassigned': 'لم يُعيّن طبيب', 'submitted_at': 'تاريخ الإرسال',
+    'age': 'الساعات منذ الإرسال', 'all': 'الكل', 'filter': 'تصفية', 'open': 'فتح', 'claim': 'تعيين الحالة لي وبدء المراجعة',
+    'revision': 'بدء مراجعة جديدة بشكل صريح', 'close': 'إغلاق الحالة بعد مراجعتها', 'review': 'نشر مراجعة الطبيب',
+    'decision': 'قرار الطبيب', 'confirmed': 'مؤكد', 'modified': 'معدّل', 'inconclusive': 'غير حاسم',
+    'referred': 'تمت الإحالة', 'triage_level': 'الأولوية التي حددها الطبيب', 'red': 'أحمر', 'amber': 'كهرماني', 'green': 'أخضر',
+    'undetermined': 'غير محددة', 'patient_message': 'رسالة / تعليمات عامة تُعرض للمريض',
+    'clinical_notes': 'ملاحظات الطبيب الخاصة', 'diagnoses': 'تشخيصات الطبيب (اختياري)',
+    'diagnosis_name': 'التشخيص', 'certainty': 'درجة التأكد', 'provisional': 'مبدئي', 'primary': 'التشخيص الرئيسي',
+    'medication': 'دواء يقرّه الطبيب (اختياري)', 'dosage': 'الجرعة (اختياري)',
+    'instructions': 'تعليمات العلاج', 'treatments': 'خطط العلاج',
+    'referral_required': 'الإحالة مطلوبة', 'referral_destination': 'جهة الإحالة', 'referral_reason': 'سبب الإحالة / توضيح الحاجة إلى تصعيد الرعاية',
+    'followup_date': 'تاريخ المتابعة', 'released': 'أحدث نتيجة أصدرها الطبيب', 'no_result': 'لم يصدر الطبيب نتيجة بعد.',
+    'review_history': 'مراجعات الطبيب السابقة', 'reviewed_at': 'تاريخ المراجعة',
+    'ai_pending': 'ربط الذكاء الاصطناعي قيد الانتظار',
+    'ai_configured': 'الذكاء الاصطناعي متاح. اقتراحاته غير مؤكدة وتساعد الطبيب في اتخاذ القرار.',
+    'ai_configuration': 'إعدادات الذكاء الاصطناعي ناقصة. تظل مراجعة الطبيب متاحة.',
+    'ai_busy': 'التحليل بالذكاء الاصطناعي قيد التشغيل. حاول بعد انتهائه؛ تظل مراجعة الطبيب متاحة.',
+    'timeout': 'انتهت مهلة تحليل الذكاء الاصطناعي. تظل مراجعة الطبيب متاحة.',
+    'adapter_error': 'تعذر تشغيل تحليل الذكاء الاصطناعي أو التحقق من نتائجه. تظل مراجعة الطبيب متاحة.',
+    'interrupted': 'توقف تحليل الذكاء الاصطناعي عند إعادة تشغيل التطبيق. اطلب التحليل مجددًا لإعادة المحاولة.',
+    'confidence': 'نسبة التشابه حسب الذكاء الاصطناعي', 'ai': 'اقتراحات الذكاء الاصطناعي', 'ai_request': 'بدء تحليل الذكاء الاصطناعي',
+    'ai_history': 'التحليلات السابقة', 'ai_priority': 'الأولوية المقترحة', 'latest_success': 'أحدث نتيجة للذكاء الاصطناعي', 'no_analysis': 'لا توجد تحليلات بعد.',
+    'ai_disclaimer': 'هذه اقتراحات فقط. يجب أن يؤكد الطبيب التشخيص وخطة الرعاية.',
+    'ai_score_help': 'النسبة الأعلى تعني تشابهًا أكبر مع الصور والإجابات بحسب الذكاء الاصطناعي. لا تعني احتمال الإصابة بالحالة أو مدى خطورتها.',
+    'ai_score_percent': '{percent}٪', 'ai_score_small': 'أقل من 1٪',
+    'ai_score_large': 'أكثر من 99٪', 'ai_score_unknown': 'النسبة غير متاحة',
+    'ai_more_suggestions': 'اقتراحات أخرى', 'ai_report_details': 'كيف ظهرت هذه النتيجة وما حدودها',
+    'choose': 'اختر إجابة',
+    'ai_inputs_title': 'إجابات للذكاء الاصطناعي',
+    'ai_inputs_help': 'أكمل الإجابات الناقصة وأكّد كل مجموعة من مربعات الاختيار. إجابات المريض المحفوظة معبأة مسبقًا. يمكنك مراجعة الحالة دون تشغيل الذكاء الاصطناعي.',
+    'ai_inputs_required': 'أكمل الإجابات الناقصة وأكّد كل مجموعة بعد النظر في جميع بنودها. اختر «غير معروف» عند وجود هذا الخيار وحين يكون مناسبًا. تظل مراجعة الطبيب متاحة.',
+    'patient_model_questions': 'أسئلة إضافية عن الجلد',
+    'patient_model_help': 'تُحفظ هذه الإجابات مع حالتك، ويمكن أن تساعد في التحليل الذي يطلبه الطبيب. يمكنك الحفظ أو الإرسال مع وجود أسئلة بلا إجابة؛ يظل بإمكان الطبيب مراجعة الحالة. اختر نطاق المدة مباشرة. تُؤخذ الفئة العمرية والجنس عند الولادة من ملفك.',
+    'checkbox_help': 'اختر كل ما ينطبق. المربعات المحددة تعني «نعم». أكّد المجموعة بعد النظر في جميع البنود؛ عندها تعني المربعات غير المحددة «لا». دون التأكيد تظل الإجابات غير المدخلة «غير معروف»، وتبقى إجابات «لا» المحفوظة كما هي. للإجابة بـ«لا» عن الجميع، اترك المربعات فارغة وأكّد المجموعة.',
+    'checkbox_complete': 'نظرت في جميع بنود هذه المجموعة؛ البنود غير المحددة لا تنطبق.',
+    'saved_no': 'الإجابة المحفوظة: لا',
+    'saved_patient_answer': 'إجابة المريض المحفوظة',
+    'derived_profile': 'من ملفك؛ يُحسب العمر في تاريخ إرسال الحالة.',
+    'recorded_duration_days': 'المدة المسجلة سابقًا بالأيام',
+    'ai_input_conflict': 'الإجابات تتعارض مع الاستبيان المحفوظ أو مع بعضها. تحقق منها وحاول مجددًا.',
+    'ai_model_unavailable': 'نموذج الذكاء الاصطناعي المحلي غير متاح. تحقق من ملفات النموذج ومتطلبات تشغيله. تظل مراجعة الطبيب متاحة.',
+    'ai_local_summary': 'قارن الذكاء الاصطناعي الحالة بـ{count} مجموعة من الحالات الجلدية.',
+    'ai_local_rationale': 'تجمع الاقتراحات بين الصور وإجابات الاستبيان. عند وجود صور متعددة، تُجمع نتائجها.',
+    'ai_local_limitations': 'قد يخطئ الذكاء الاصطناعي. لا يفحص جودة الصور ولا يفسر الملاحظات المكتوبة. تُحفظ الإجابات الإضافية التي يدخلها الطبيب مع هذا التحليل فقط.',
+    'ai_warning_output': 'تم استنتاج صيغة النتيجة. يجب أن يراجع الطبيب الاقتراحات.',
+    'ai_warning_objective': 'بعض إعدادات النتائج غير موجودة في النموذج المحفوظ. يجب أن يراجع الطبيب الاقتراحات.',
+    'ai_warning_images': 'بعض إعدادات معالجة الصور ناقصة؛ تم استخدام الإعدادات المعتادة.',
+    'ai_warning_classes': 'أسماء الحالات غير متاحة. المعرّفات المعروضة ليست تشخيصات.',
+    'ai_warning_text': 'يستخدم الذكاء الاصطناعي الإجابات المنظمة فقط؛ ولا يفسر الملاحظات المكتوبة.',
+    'scin_group_textures': 'مظهر الجلد وملمسه',
+    'scin_group_body': 'مناطق الجسم المصابة',
+    'scin_group_local': 'أعراض الحالة',
+    'scin_group_systemic': 'أعراض أخرى',
+    'scin_group_demographics': 'بيانات المريض وتصنيف الحالة',
+    'scin_textures_raised_or_bumpy': 'بارز أو ذو نتوءات',
+    'scin_textures_flat': 'مسطح',
+    'scin_textures_rough_or_flaky': 'خشن أو متقشر',
+    'scin_textures_fluid_filled': 'مملوء بسائل',
+    'scin_body_parts_head_or_neck': 'الرأس أو الرقبة',
+    'scin_body_parts_arm': 'الذراع',
+    'scin_body_parts_palm': 'راحة اليد',
+    'scin_body_parts_back_of_hand': 'ظهر اليد',
+    'scin_body_parts_torso_front': 'مقدمة الجذع',
+    'scin_body_parts_torso_back': 'ظهر الجذع',
+    'scin_body_parts_genitalia_or_groin': 'المنطقة التناسلية أو الأربية',
+    'scin_body_parts_buttocks': 'الأرداف',
+    'scin_body_parts_leg': 'الساق',
+    'scin_body_parts_foot_top_or_side': 'أعلى القدم أو جانبها',
+    'scin_body_parts_foot_sole': 'باطن القدم',
+    'scin_body_parts_other': 'منطقة أخرى من الجسم',
+    'scin_condition_symptoms_bothersome_appearance': 'مظهر يسبب الانزعاج',
+    'scin_condition_symptoms_bleeding': 'نزيف',
+    'scin_condition_symptoms_increasing_size': 'ازدياد الحجم',
+    'scin_condition_symptoms_darkening': 'ازدياد اللون قتامة',
+    'scin_condition_symptoms_itching': 'حكة',
+    'scin_condition_symptoms_burning': 'حرقة',
+    'scin_condition_symptoms_pain': 'ألم',
+    'scin_condition_symptoms_no_relevant_experience': 'لا يوجد أي من أعراض الحالة، بما فيها الحكة والألم والنزيف',
+    'scin_other_symptoms_fever': 'حمى',
+    'scin_other_symptoms_chills': 'قشعريرة',
+    'scin_other_symptoms_fatigue': 'إرهاق',
+    'scin_other_symptoms_joint_pain': 'ألم المفاصل',
+    'scin_other_symptoms_mouth_sores': 'تقرحات الفم',
+    'scin_other_symptoms_shortness_of_breath': 'ضيق التنفس',
+    'scin_other_symptoms_no_relevant_symptoms': 'لا يوجد أي من الأعراض الأخرى، بما فيها الحمى',
+    'scin_age_group': 'الفئة العمرية',
+    'scin_sex_at_birth': 'الجنس عند الولادة',
+    'scin_fitzpatrick_skin_type': 'نوع البشرة وفق تصنيف فيتزباتريك',
+    'scin_related_category': 'فئة المشكلة المُبلغ عنها',
+    'scin_condition_duration': 'نطاق مدة الحالة',
+    'scin_AGE_18_TO_29': '18–29 سنة',
+    'scin_AGE_30_TO_39': '30–39 سنة',
+    'scin_AGE_40_TO_49': '40–49 سنة',
+    'scin_AGE_50_TO_59': '50–59 سنة',
+    'scin_AGE_60_TO_69': '60–69 سنة',
+    'scin_AGE_70_TO_79': '70–79 سنة',
+    'scin_AGE_UNKNOWN': 'غير معروف / خارج الفئات العمرية المذكورة',
+    'scin_FEMALE': 'أنثى',
+    'scin_MALE': 'ذكر',
+    'scin_OTHER_OR_UNSPECIFIED': 'آخر / غير محدد',
+    'scin_FST1': 'النوع الأول', 'scin_FST2': 'النوع الثاني',
+    'scin_FST3': 'النوع الثالث', 'scin_FST4': 'النوع الرابع',
+    'scin_FST5': 'النوع الخامس', 'scin_FST6': 'النوع السادس',
+    'scin_NONE_IDENTIFIED': 'لم يُحدد نوع البشرة',
+    'scin_UNKNOWN': 'غير معروف',
+    'scin_ACNE': 'حب الشباب',
+    'scin_GROWTH_OR_MOLE': 'نمو جلدي أو شامة',
+    'scin_HAIR_LOSS': 'تساقط الشعر',
+    'scin_LOOKS_HEALTHY': 'يبدو سليمًا',
+    'scin_NAIL_PROBLEM': 'مشكلة في الأظافر',
+    'scin_OTHER_HAIR_PROBLEM': 'مشكلة أخرى في الشعر',
+    'scin_OTHER_ISSUE_DESCRIPTION': 'مشكلة أخرى',
+    'scin_PIGMENTARY_PROBLEM': 'مشكلة في تصبغ الجلد',
+    'scin_RASH': 'طفح جلدي',
+    'scin_LESS_THAN_ONE_WEEK': 'أقل من أسبوع',
+    'scin_MORE_THAN_FIVE_YEARS': 'أكثر من خمس سنوات',
+    'scin_MORE_THAN_ONE_YEAR': 'أكثر من سنة',
+    'scin_ONE_DAY': 'يوم واحد',
+    'scin_ONE_TO_FOUR_WEEKS': 'من أسبوع إلى أربعة أسابيع',
+    'scin_ONE_TO_THREE_MONTHS': 'من شهر إلى ثلاثة أشهر',
+    'scin_SINCE_CHILDHOOD': 'منذ الطفولة',
+    'scin_THREE_TO_TWELVE_MONTHS': 'من ثلاثة إلى اثني عشر شهرًا',
+    'pending': 'بانتظار البدء', 'running': 'قيد التشغيل', 'completed': 'مكتمل', 'failed': 'تعذر الإكمال',
+    'worker_blocked': 'إرسال الحالات بمساعدة العامل الصحي بانتظار إضافة صلاحيات الوصول إلى المريض وتسجيل هوية المُرسِل في قاعدة البيانات. لا يمكن لهذا الحساب الوصول إلى سجلات المرضى أو نشر القرارات.',
+    'resubmit_blocked': 'طلب الطبيب معلومات إضافية. إعادة الإرسال بانتظار إضافة سجل دائم لمراجعات الإرسال؛ المحتوى المرسل محمي من التعديل. استخدم وسيلة التواصل الخارجية التي حددها الطبيب لهذا العرض.',
+    'arabic_pending': 'الواجهة العربية متاحة. يمكن إدخال الأسماء والملاحظات الطبية بالعربية أو الإنجليزية.',
+    'empty': 'لا يوجد', 'error': 'تعذر إكمال الطلب', 'return': 'العودة إلى النموذج السابق',
+    'required': 'أكمل جميع الحقول المطلوبة؛ لا يُسمح بالقيم الفارغة أو التي تتكون من مسافات فقط.',
+    'invalid_date': 'أدخل تاريخًا صحيحًا بصيغة YYYY-MM-DD؛ يجب ألا يكون تاريخ الميلاد في المستقبل.',
+    'invalid_duration': 'يجب أن تكون المدة عددًا صحيحًا غير سالب، أو اتركها فارغة إن كانت غير معروفة.',
+    'invalid_boolean': 'اختر نعم أو لا أو غير معروف لكل عرض.',
+    'invalid_choice': 'أحد الخيارات غير صالح. أعد تحميل النموذج واختر قيمة من الخيارات المعروضة.',
+    'submit_required': 'للإرسال يلزم إدخال الشكوى وحفظ الاستبيان واختيار موضع الجسم المصاب ورفع صورة والموافقة الصريحة.',
+    'forbidden': 'لا يملك هذا الحساب صلاحية الوصول إلى هذا السجل أو تنفيذ هذا الإجراء.',
+    'not_found': 'السجل غير موجود.', 'transition': 'هذا الإجراء غير مسموح في حالة الطلب الحالية. أعد تحميل الحالة.',
+    'csrf': 'انتهت صلاحية جلسة النموذج أو أنها غير صالحة. أعد تحميل الصفحة وحاول مجددًا.',
+    'bad_image': 'اختر صورة JPEG أو PNG صالحة وغير متحركة وضمن حد الحجم المعروض. تعذر فتح هذه الصورة بأمان.',
+    'image_count': 'عدد الصور يتجاوز الحد المسموح لهذه الحالة.', 'site_image': 'لا يمكن إزالة موضع جسم يحتوي على صور.',
+    'review_diagnosis': 'القرار المؤكد أو المعدّل يحتاج إلى تشخيص. عند إدخال تشخيصات، اختر تشخيصًا رئيسيًا واحدًا فقط من التشخيصات غير الفارغة.',
+    'treatment_diagnosis': 'تحتاج حقول العلاج إلى تشخيص وتعليمات غير فارغة. للنصائح العامة دون تشخيص، استخدم رسالة المريض.',
+    'referral_validation': 'تحتاج الإحالة إلى تفعيل خيار الإحالة وتحديد الجهة وإدخال سبب غير فارغ. أزل تحديد الإحالة إن لم تكن مطلوبة.',
+    'conflict': 'غيّر إجراء آخر هذه الحالة. أعد تحميلها قبل النشر.',
+    'storage': 'تعذرت عملية التخزين أو قاعدة البيانات. لم يتم نشر مراجعة جزئية. أعد التحميل وحاول مجددًا.',
+    'too_large': 'حجم طلب الرفع يتجاوز الحد المسموح.', 'local_only': 'الوصول إلى PaliDerm مقصور على الاتصال المحلي لهذا الجهاز.',
+    'unsupported': 'هذه العملية بانتظار إضافة موثقة إلى قاعدة البيانات.',
+    'quality_warning': 'تحقق من جودة الصور قبل اتخاذ قرار.',
+}
+
+# Keys map exact trained labels to display text only; prediction/storage names stay English.
+CONDITION_LABELS = {
+    'Acne/Follicular': ('Acne / follicular conditions', 'حب الشباب / اضطرابات بصيلات الشعر'),
+    'Bacterial Infection': ('Bacterial infection', 'عدوى بكتيرية'),
+    'Benign Lesion': ('Benign skin lesion', 'آفة جلدية حميدة'),
+    'Dermatitis/Eczema': ('Dermatitis / eczema', 'التهاب الجلد / الإكزيما'),
+    'Fungal Infection': ('Fungal infection', 'عدوى فطرية'),
+    'Hair/Nail Disorder': ('Hair / nail disorder', 'اضطراب الشعر / الأظافر'),
+    'Inflammatory/Autoimmune': ('Inflammatory / autoimmune condition', 'حالة التهابية / مناعية ذاتية'),
+    'Malignancy/Precancer': ('Cancerous / precancerous change', 'تغير سرطاني / ما قبل سرطاني'),
+    'Other': ('Other', 'أخرى'),
+    'Parasite/Bite': ('Parasite / bite', 'طفيليات / لدغة'),
+    'Pigment Disorder': ('Pigmentation disorder', 'اضطراب تصبغ الجلد'),
+    'Trauma/Wound': ('Injury / wound', 'إصابة / جرح'),
+    'Vascular/Purpura': ('Blood vessel condition / purpura', 'اضطراب الأوعية الدموية / الفرفرية'),
+    'Viral Infection': ('Viral infection', 'عدوى فيروسية'),
+}
+for _condition, (_english, _arabic) in CONDITION_LABELS.items():
+    EN['condition_' + _condition] = _english
+    AR['condition_' + _condition] = _arabic
+
+CATALOG = {'en': EN, 'ar': AR}
 
 # Presentation aliases for already-persisted English prototype explanations.
 # Do not rewrite clinical history or recalculate a stored priority to change copy.
@@ -234,6 +497,70 @@ LEGACY_TRIAGE_REASONS = {
     'Model output contains labels without a triage mapping; manual review is needed.': 'triage_unmapped',
     'No configured priority-raising rule matched; clinician review is still required.': 'triage_no_rule',
 }
+for _key in ('triage_breathing', 'triage_worsening', 'triage_fever_discharge',
+             'triage_missing_symptoms', 'triage_invalid_model', 'triage_uncertain',
+             'triage_unmapped', 'triage_no_rule', 'triage_review_required'):
+    # Saved reports retain the language of their analysis. Localize known generated
+    # text on display instead of rewriting the encrypted clinical history.
+    LEGACY_TRIAGE_REASONS[EN[_key]] = _key
+    LEGACY_TRIAGE_REASONS[AR[_key]] = _key
+
+LEGACY_AI_NARRATIVES = {
+    'The saved custom SCIN model processes each supplied photograph with the same case metadata. Scores are averaged across photographs and ranked; they are not clinician diagnoses.': 'ai_local_rationale',
+    'Uncalibrated prototype scores for grouped conditions, not validated clinical probabilities. This model does not assign clinical priority or assess image quality. Free-text complaints and notes are not embedded. Supplementary provider answers are recorded in this analysis attempt; they do not update the submitted clinical record.': 'ai_local_limitations',
+    'This prototype can be wrong. It does not check photo quality or interpret written notes. Extra answers entered by a clinician are saved with this analysis only.': 'ai_local_limitations',
+    'Output semantics inferred from values in [0,1]; declare output.type to remove ambiguity.': 'ai_warning_output',
+    'Logit objective was not saved; using configured multi_label or softmax fallback. Declare output.type for reliability.': 'ai_warning_objective',
+    'Training image statistics were not fully saved; using 224px/ImageNet defaults for missing settings.': 'ai_warning_images',
+    'Class mapping unavailable; class_N labels are technical placeholders, not diagnoses.': 'ai_warning_classes',
+    'Free-text symptoms are not embedded by this model adapter; only configured structured features are encoded.': 'ai_warning_text',
+}
+for _key in ('ai_local_rationale', 'ai_local_limitations', 'ai_warning_output',
+             'ai_warning_objective', 'ai_warning_images', 'ai_warning_classes', 'ai_warning_text'):
+    LEGACY_AI_NARRATIVES[EN[_key]] = _key
+    LEGACY_AI_NARRATIVES[AR[_key]] = _key
+
+
+def display_condition(name, locale='en'):
+    """Translate an exact supported model label without changing stored predictions.
+
+    Unknown labels are retained verbatim so a new model's output is never silently
+    relabeled. Previously translated generated labels can switch languages too.
+    """
+    if name in CONDITION_LABELS:
+        return translate('condition_' + name, locale)
+    for condition, labels in CONDITION_LABELS.items():
+        if name in labels:
+            return translate('condition_' + condition, locale)
+    return name
+
+
+def display_ai_narrative(text, locale='en'):
+    """Localize known generated report copy, preserving custom text and saved data.
+
+    Some historical results contain older English notices. Exact aliases and the
+    fixed count-summary template translate those messages on retrieval; clinical
+    notes and unknown narratives are never rewritten or interpreted.
+    """
+    if not isinstance(text, str):
+        return text
+    translated = []
+    for line in text.split('\n'):
+        if line in LEGACY_AI_NARRATIVES:
+            translated.append(translate(LEGACY_AI_NARRATIVES[line], locale))
+            continue
+        summary = None
+        summaries = (EN['ai_local_summary'], AR['ai_local_summary'],
+                     'The local SCIN model returned {count} unconfirmed diagnosis-group scores.')
+        for template in summaries:
+            prefix, suffix = template.split('{count}')
+            if line.startswith(prefix) and line.endswith(suffix):
+                count = line[len(prefix):len(line) - len(suffix)] if suffix else line[len(prefix):]
+                if re.fullmatch(r'[0-9]+', count):
+                    summary = translate('ai_local_summary', locale, count=count)
+                    break
+        translated.append(summary if summary is not None else line)
+    return '\n'.join(translated)
 
 
 def brief_triage_reason(reason, locale='en'):
@@ -246,7 +573,14 @@ def brief_triage_reason(reason, locale='en'):
         return translate(LEGACY_TRIAGE_REASONS[reason], locale)
     prefix, suffix = 'Top model suggestion is ', ' (illustrative urgent mapping).'
     if reason.startswith(prefix) and reason.endswith(suffix):
-        return translate('triage_model_concern', locale, condition=reason[len(prefix):-len(suffix)])
+        return translate('triage_model_concern', locale,
+                         condition=display_condition(reason[len(prefix):-len(suffix)], locale))
+    for catalog in (EN, AR):
+        prefix, suffix = catalog['triage_model_concern'].split('{condition}')
+        if reason.startswith(prefix) and reason.endswith(suffix):
+            condition = reason[len(prefix):-len(suffix)] if suffix else reason[len(prefix):]
+            return translate('triage_model_concern', locale,
+                             condition=display_condition(condition, locale))
     return reason
 
 

@@ -94,8 +94,16 @@ def create(provider_username, provider_password, *, analyze=False):
         assert 'Latest AI result' in model_page
         assert 'AI match score:' in model_page
         assert '%</bdi>' in model_page
-        assert 'AI-assisted triage — prototype; clinician review required.' in model_page
-        print('PASS: real patient checkbox answers → saved model inference without clinician re-entry.')
+        assert 'AI-assisted triage — clinician review required.' in model_page
+        _, arabic_report = post('/locale', {'locale':'ar', 'next':f'/cases/{case_id}'}, f'/cases/{case_id}')
+        assert '<html lang="ar" dir="rtl">' in arabic_report
+        assert 'PaliDerm' in arabic_report and 'الذكاء الاصطناعي' in arabic_report
+        assert 'التهاب الجلد / الإكزيما' in arabic_report
+        assert 'prototype' not in arabic_report.lower()
+        _, english_report = post('/locale', {'locale':'en', 'next':f'/cases/{case_id}'}, f'/cases/{case_id}')
+        assert '<html lang="en" dir="ltr">' in english_report
+        assert 'Synthetic demonstration only.' in english_report
+        print('PASS: saved model inference → Arabic RTL report → English switch; disclaimer and model scores preserved.')
     post(f'/cases/{case_id}/review', {'decision':'confirmed','triage_level':'undetermined','patient_message':ARABIC,
                                     'clinical_notes':'PRIVATE HTTP SMOKE NOTE','diagnosis_0':'Synthetic clinician documentation',
                                     'certainty_0':'provisional','primary':'0','instructions_0':'Synthetic treatment instructions',

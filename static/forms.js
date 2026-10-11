@@ -7,7 +7,7 @@
   const timestamps = document.querySelectorAll('time[data-local-time]');
   if (timestamps.length && typeof Intl !== 'undefined') {
     try {
-      const formatter = new Intl.DateTimeFormat(undefined, {
+      const formatter = new Intl.DateTimeFormat(document.documentElement?.lang || undefined, {
         year: 'numeric', month: 'short', day: 'numeric',
         hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
       });

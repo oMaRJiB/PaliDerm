@@ -53,6 +53,27 @@ def choice(value, allowed):
     return value
 
 
+def contact(value, kind):
+    """Validate optional ASCII contact identifiers while preserving accepted text.
+
+    Names/medical free text are intentionally outside this validator. Existing
+    encrypted records are not rewritten or transliterated. This checks syntax,
+    not ownership, deliverability or a particular country's telephone format.
+    """
+    if value is None or value == '':
+        return None
+    valid = isinstance(value, str) and value.isascii()
+    if kind == 'email':
+        valid = valid and len(value) <= 254 and re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', value)
+    elif kind == 'phone':
+        valid = valid and re.fullmatch(r'\+?[0-9(][0-9() .-]{1,38}[0-9)]', value)
+    else:
+        raise ValueError('Unsupported contact field')
+    if not valid:
+        raise Problem('invalid_' + kind)
+    return value
+
+
 def role(identity, expected):
     """Require a resolved identity with the expected server-owned role."""
     if not identity or identity['role'] != expected:

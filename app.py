@@ -10,7 +10,7 @@ import click
 from flask import Flask, g, redirect, render_template, request, send_file, session, url_for, flash, jsonify
 from werkzeug.exceptions import HTTPException
 from backend.db import ROOT, close_db, initialize
-from backend.i18n import translate, brief_triage_reason
+from backend.i18n import translate, brief_triage_reason, display_condition, display_ai_narrative
 from backend import services as svc
 from backend.auth import AuthService
 from backend.security import Cipher, EncryptionError
@@ -120,13 +120,24 @@ def create_app(config=None):
         """Present legacy explanations concisely without modifying encrypted history."""
         return brief_triage_reason(reason, g.get('locale', 'en'))
 
+    @app.template_filter('condition_label')
+    def condition_label(value):
+        """Translate saved model labels for display; never change diagnosis identifiers."""
+        return display_condition(value, g.get('locale', 'en'))
+
+    @app.template_filter('ai_narrative')
+    def ai_narrative(value):
+        """Localize known generated notices while retaining arbitrary clinical text."""
+        return display_ai_narrative(value, g.get('locale', 'en'))
+
     @app.before_request
     def local_and_session():
         """Enforce loopback access, reload account authority and validate CSRF before routes."""
         host = urlsplit('http://' + request.host).hostname
         if request.remote_addr not in ('127.0.0.1', '::1') or host not in ('localhost', '127.0.0.1', '::1'):
             raise svc.Problem('local_only', 403)
-        g.locale = app.config['APP_LOCALE'] if app.config['APP_LOCALE'] in ('en', 'ar') else 'en'
+        locale = session.get('locale', app.config['APP_LOCALE'])
+        g.locale = locale if locale in ('en', 'ar') else 'en'
         g.identity = auth.identity()
         if 'csrf' not in session:
             session['csrf'] = secrets.token_hex(32)
@@ -179,6 +190,22 @@ def create_app(config=None):
     def home():
         """Render role-appropriate entry actions without reading other patients’ clinical records."""
         return render_template('home.html')
+
+    @app.post('/locale')
+    def change_locale():
+        """Persist a browser language without changing authority or accepting open redirects."""
+        locale = request.form.get('locale')
+        target = request.form.get('next') or url_for('home')
+        try:
+            parsed = urlsplit(target)
+        except ValueError:
+            raise svc.Problem('invalid_choice') from None
+        if (locale not in ('en', 'ar') or parsed.scheme or parsed.netloc
+                or not target.startswith('/') or target.startswith('//')
+                or '\\' in target or any(ord(char) < 32 for char in target)):
+            raise svc.Problem('invalid_choice')
+        session['locale'] = locale
+        return redirect(target)
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():

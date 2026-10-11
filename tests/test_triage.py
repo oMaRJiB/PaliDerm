@@ -11,6 +11,7 @@ from app import create_app
 from backend.ai.triage import triage_case, CONDITION_PRIORITIES
 from backend.db import get_db
 from backend.security import PREFIX
+from backend.i18n import translate
 from fixtures import FixtureAdapter
 from test_workflow import WorkflowSupport, TEST_ENCRYPTION_KEY
 
@@ -92,7 +93,7 @@ class TriageStorageTests(WorkflowSupport, unittest.TestCase):
         self.assertTrue(envelope['triage']['needs_manual_review'])
         page = self.client.get(f'/cases/{cid}').get_data(as_text=True)
         self.assertIn('Priority undetermined — manual review needed', page)
-        self.assertIn('AI-assisted triage — prototype; clinician review required.', page)
+        self.assertIn(translate('assisted_triage_notice'), page)
         self.assertEqual(self.scalar('SELECT count(*) FROM ProviderReview'), 0)
         self.login('patient:2')
         self.assertEqual(self.client.get(f'/cases/{cid}').status_code, 403)

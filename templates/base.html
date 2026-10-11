@@ -4,8 +4,7 @@
 <link rel="stylesheet" href="{{ url_for('static',filename='app.css') }}">
 </head><body data-working="{{ t('working') }}" data-network-error="{{ t('network_error') }}" data-remove="{{ t('remove_selection') }}" data-selected-preview="{{ t('selected_preview') }}" data-preview-unavailable="{{ t('preview_unavailable') }}" data-time-local="{{ t('time_local_notice') }}">
 <a class="skip-link" href="#main">{{ t('skip_content') }}</a>
-<header><div class="header-inner"><h1>{{ t('app_title') }}</h1><p>{{ t('prototype') }}</p><p class="emergency"><strong>{{ t('emergency') }}</strong></p>
-{% if locale == 'ar' %}<p>{{ t('arabic_pending') }}</p>{% endif %}
+<header><div class="header-inner"><h1 class="brand-title" dir="ltr">{{ t('app_title') }}</h1><p>{{ t('prototype') }}</p><p class="emergency"><strong>{{ t('emergency') }}</strong></p>
 <nav aria-label="{{ t('navigation') }}">
 <a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>{{ t('home') }}</a>
 {% if identity %}
@@ -14,6 +13,7 @@
 <span class="identity" dir="auto">{{ identity.name }} ({{ t(identity.role) }})</span>
 <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>{{ t('logout') }}</button></form>
 {% else %}<a href="{{ url_for('login') }}" {% if request.endpoint == 'login' %}aria-current="page"{% endif %}>{{ t('login') }}</a><a href="{{ url_for('register') }}" {% if request.endpoint == 'register' %}aria-current="page"{% endif %}>{{ t('register') }}</a>{% endif %}
+<form class="locale-switch" method="post" action="{{ url_for('change_locale') }}" aria-label="{{ t('language') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="{{ request.full_path.rstrip('?') if request.method == 'GET' else url_for('home') }}"><button name="locale" value="en" lang="en" dir="ltr" aria-pressed="{{ 'true' if locale == 'en' else 'false' }}">{{ t('language_english') }}</button><button name="locale" value="ar" lang="ar" dir="rtl" aria-pressed="{{ 'true' if locale == 'ar' else 'false' }}">{{ t('language_arabic') }}</button></form>
 </nav></div></header>
 {% for message in get_flashed_messages() %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
 <main id="main" tabindex="-1">{% block content %}{% endblock %}<p class="time-note" data-timezone-notice hidden></p></main>

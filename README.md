@@ -1,4 +1,19 @@
-# PaliDerm local prototype
+# PaliDerm
+
+The interface is branded **PaliDerm** with Palestinian flag accent colors. Its
+English/العربية buttons change the interface language and page direction, including
+login/signup, intake, queue, clinical review, errors, notices and model-label
+display. The disclaimer and emergency guidance remain in both languages. The
+language is retained through login/logout and server restart in the same browser.
+
+Names, complaints and notes may be entered in Arabic or English and are preserved
+exactly. Usernames and email addresses use Latin/English characters; telephone
+numbers use 0–9 with ordinary international formatting. These restrictions are
+validated by the server, with translated guidance and LTR technical inputs.
+Passwords may contain Unicode. Existing records are not rewritten. Patient and
+clinician free text is not automatically translated; backend identifiers and saved
+model labels remain English. Arabic interface software checks are separate from
+real-device visual/keyboard/screen-reader verification.
 
 A working patient-intake → private images → consent submission → clinician review → patient-result workflow. Synthetic data only. Plain Flask/Jinja forms with password login and patient signup. The supplied base schema v2 is unchanged; runtime v4 adds authenticated field/file encryption after the additive authentication migration. The user-selected local SCIN model is available for explicit clinician requests; unavailable AI never blocks submission or review. This is not an emergency service, clinical validation, production security, HIPAA compliance, or a complete implementation of the long-term plan.
 
@@ -74,7 +89,7 @@ Direct Flask CLI commands now select the same existing `instance/encryption.key`
 
 ### Minimal AI-assisted triage
 
-Event timestamps display in the browser/device's local timezone and date format,
+Event timestamps display in the browser/device's local timezone and the selected interface language,
 including a timezone label. Hovering a timestamp shows its original UTC value.
 Without JavaScript or supported date formatting, the explicitly labeled UTC value
 remains visible. Storage, sorting and audit timestamps remain UTC. Birthdays and
@@ -94,7 +109,7 @@ After successful SCIN inference, `backend/ai/triage.py:triage_case` evaluates st
 
 `AI_TRIAGE_DEMO_THRESHOLD=0.5` is an **unvalidated demo uncertainty threshold**, not a severity threshold. A lower top score, missing/invalid output, any unmapped label or missing required symptom answer sets `needs_manual_review`. Routine with this flag displays **“Priority undetermined — manual review needed”**. Urgent/emergency remain raised even when review is required. The separate clinician form remains authoritative; these illustrative rules are not validated medical guidance or treatment advice.
 
-The clinician case page labels results **“AI-assisted triage — prototype; clinician review required.”** Level/reasons/manual-review/method persist in the existing encrypted AI rationale envelope, atomically with predictions; no schema migration. Existing queue enums are emergency→red, urgent→amber, routine→green, or routine+manual→undetermined. Old attempts retain their original results; retry inference to obtain triage under this policy. Patients still receive clinician-released outcomes only. Unavailable AI continues to allow submission and manual clinical review.
+The clinician case page labels results **“AI-assisted triage — clinician review required.”** Level/reasons/manual-review/method persist in the existing encrypted AI rationale envelope, atomically with predictions; no schema migration. Existing queue enums are emergency→red, urgent→amber, routine→green, or routine+manual→undetermined. Old attempts retain their original results; retry inference to obtain triage under this policy. Patients still receive clinician-released outcomes only. Unavailable AI continues to allow submission and manual clinical review.
 
 ## Accounts and walkthrough
 
@@ -139,7 +154,7 @@ Reviews publish atomically with the case state; history remains stored. An expli
 | `UPLOAD_DIR` | defaults to `instance/encrypted/uploads` (private, outside static assets) |
 | `ENCRYPTION_KEY_FILE` | launcher selects private `instance/encryption.key`; alternatively supply `ENCRYPTION_KEY`, never both |
 | `SESSION_COOKIE_SECURE` | `0` for local HTTP; set `1` with HTTPS |
-| `APP_LOCALE` | `en` (`ar` prepares rtl with English fallback/incomplete notice) |
+| `APP_LOCALE` | `en` (set `ar` for an Arabic/RTL default; browser language buttons override it) |
 | `MODEL_PATH` | `notebooks/SCIN_custom_model.keras`; explicitly empty disables inference |
 | `AI_TIMEOUT_SECONDS` | `60`, including the first request's lazy model load |
 | `MAX_IMAGE_BYTES` | `8388608` (8 MiB per original image) |
@@ -154,15 +169,15 @@ There is no application MAX_IMAGE_PIXELS setting or patient-facing pixel limit. 
 
 Core dependencies: Flask 3.1.2, Pillow 12.0.0, cryptography 50.0.2 and Werkzeug 3.1.9 (already supplied by Flask, explicitly pinned for password hashing). Observed transitive versions: Jinja2 3.1.6, MarkupSafe 3.0.4, click 8.5.0, itsdangerous 2.2.0, blinker 1.9.0. `pypdf 6.1.1` was used solely to inspect the supplied white paper and is not an application dependency. Saved-model inference has separate optional runtime dependencies documented below; it does not import TensorFlow/Keras during ordinary Flask startup. No frontend framework, extra service or destructive migration was introduced. Only the documented additive Account and v4 encryption extensions were applied; schema.sql is unchanged.
 
-English UI strings live in `backend/i18n.py`. Arabic user-entered names, complaints, messages and notes are preserved exactly; HTML uses UTF-8 and automatic text direction. Arabic translation and full browser RTL verification remain pending. **Arabic interface support is not complete.**
+English and Arabic UI strings live in `backend/i18n.py`, with matching keys and placeholders. Arabic user-entered names, complaints, messages and notes are preserved exactly; HTML uses UTF-8 and automatic text direction. English/العربية buttons switch labels and page direction without changing stored clinical text. Full browser/device RTL and assistive-technology verification remain pending; complete Arabic support is not yet claimed.
 
 ## Tests and handoff
 
 ```sh
-PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_encryption test_auth test_workflow test_intake test_presentation test_ai_runner test_local_model_adapter -v
+PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest test_localization test_presentation test_triage test_ai_runner test_workflow test_auth test_encryption test_intake test_local_model_adapter -v
 ```
 
-80 application tests passed after the patient-questionnaire update. The real HTTP workflow also passed with patient checkbox answers, the actual saved Keras model, encrypted scores and a child-process restart, preserving exact Arabic text, released care and identical image bytes. These are software checks with synthetic inputs, not clinical validation. Reproduce the isolated HTTP test (temporary database, synthetic accounts, loopback port 5001):
+100 application tests passed after the branding/Arabic update. The real HTTP workflow also passed with patient checkbox answers, the actual saved Keras model, Arabic/English report switching, encrypted scores and a child-process restart, preserving exact Arabic text, released care and identical image bytes. These are software checks with synthetic inputs, not clinical validation. Reproduce the isolated HTTP test (temporary database, synthetic accounts, loopback port 5001):
 
 ```sh
 PYTHONPATH=. .venv/bin/python tests/live_smoke.py
@@ -190,12 +205,12 @@ Run the foreground server from this repository in an ordinary terminal:
 
 That terminal stays occupied and shows request logs. Stop it with **Ctrl-C in that same terminal**; close/reopen a browser tab without stopping the server. Ctrl-C stops Flask; it does not delete SQLite or uploads. Relaunch with the same command to keep saved data. Do not use debug/reloader or multiple server processes with the local AI runner.
 
-At the 2026-10-11 UI/local-time verification, the restarted server is PID **7163**, running in a Codex-managed background process without an interactive terminal. It uses the encrypted dataset and selected SCIN model. To take over in your own terminal:
+At the 2026-10-11 branding/Arabic verification, the restarted server is PID **9580**, running in a Codex-managed background process without an interactive terminal. It uses the encrypted dataset and selected SCIN model. To take over in your own terminal:
 
 ```sh
 lsof -nP -iTCP:5000 -sTCP:LISTEN
 # Verify the Python process is this app. Use its current numeric PID here:
-kill -TERM 7163
+kill -TERM 9580
 ./run-local.sh
 ```
 
@@ -209,7 +224,7 @@ The existing backend classes remain in their original folders; see `docs/ARCHITE
 
 For this workspace, already-provisioned synthetic account credentials are in the Git-ignored `instance/test-accounts.txt` (mode 0600); these are local test credentials, not built-in application defaults. Do not rerun provisioning for those usernames. The database stores hashes only. Resetting the demo removes accounts as well as cases.
 
-Optional JavaScript logic smoke test, if Node.js is installed: `node tests/forms_smoke.mjs`. It uses lightweight DOM doubles and does not replace a real browser/mobile/assistive-technology check. Full Arabic translations and browser RTL verification remain pending. Restart an already-running Flask process after changing Python or cached templates; the normal non-debug server does not reload application code automatically.
+Optional JavaScript logic smoke test, if Node.js is installed: `node tests/forms_smoke.mjs`. It uses lightweight DOM doubles and does not replace a real browser/mobile/assistive-technology check. Arabic translations and RTL markup are implemented; browser/device RTL verification remains pending. Restart an already-running Flask process after changing Python or cached templates; the normal non-debug server does not reload application code automatically.
 
 Native phone capture uses `capture="environment"` alongside a separate existing-file selector; [browser support varies](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/capture). The live-camera button is shown only where getUserMedia and file assignment are available. Live capture needs a secure browser context (localhost qualifies); camera permission denial leaves file/native capture available. The app remains loopback-only: responsive phone layout does not change hosting/access policy. Camera hardware and physical-phone visual checks remain unverified in this environment.
 

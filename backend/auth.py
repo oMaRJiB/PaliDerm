@@ -89,14 +89,20 @@ class AuthService:
     @staticmethod
     def _start_session(account_id):
         """Clear prior privilege/session state and issue a fresh CSRF token after authentication."""
+        locale = session.get('locale')
         session.clear()
+        if locale in ('en', 'ar'):
+            session['locale'] = locale
         session['account_id'] = account_id
         session['csrf'] = secrets.token_hex(32)
 
     @staticmethod
     def logout():
         """Clear the signed session and its CSRF token; no clinical data is modified."""
+        locale = session.get('locale')
         session.clear()
+        if locale in ('en', 'ar'):
+            session['locale'] = locale
 
     def provision(self, username, password, role, patient_id=None, provider_id=None):
         """Trusted local CLI/test operation. This is never exposed as an HTTP endpoint."""

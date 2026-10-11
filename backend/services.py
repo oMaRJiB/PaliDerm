@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 import json
 from flask import current_app
 from backend.db import get_db, transaction
-from backend.validation import Problem, now, required, calendar, integer, choice, role
+from backend.validation import Problem, now, required, calendar, integer, choice, role, contact
 from backend.images import ImageStorage
 from backend.security import cipher, encrypt_text, reveal
 from backend.preprocessing import normalize_gender, symptom_answers, SCINQuestionnaire
@@ -21,7 +21,7 @@ def create_patient(form, db=None):
     """Trusted internal profile creation; signup supplies its existing transaction."""
     values = [required(form.get('first_name')), required(form.get('last_name')),
               calendar(form.get('date_of_birth'), birth=True)]
-    values += [normalize_gender(form.get('sex')), form.get('phone') or None, form.get('email') or None]
+    values += [normalize_gender(form.get('sex')), contact(form.get('phone'), 'phone'), contact(form.get('email'), 'email')]
     values = [encrypt_text('Patient', key, value) for key, value in
               zip(('first_name','last_name','date_of_birth','sex','phone','email'), values)]
     def insert(connection):

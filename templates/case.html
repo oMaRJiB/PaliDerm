@@ -28,7 +28,7 @@
 {% endif %}
 <button>{{ t('ai_request') }}</button></form>
 <details><summary>{{ t('ai_history') }}</summary><ul>{% for a in analyses %}<li><bdi dir="ltr">{{ a.analysis_id }} / {{ timestamp(a.started_at) }} / {{ a.model_name }}</bdi>: {{ t(a.status) }}{% if a.error_message %} — {{ t(a.error_message) }}{% endif %}</li>{% else %}<li>{{ t('no_analysis') }}</li>{% endfor %}</ul></details>
-{% macro suggestions(items, start=1) %}<ol class="ai-suggestions" start="{{ start }}">{% for c in items %}<li><span dir="auto">{{ c.diagnosis_name }}</span> — {{ t('confidence') }}: <bdi dir="ltr">{{ c.confidence|ai_score }}</bdi></li>{% endfor %}</ol>{% endmacro %}
+{% macro suggestions(items, start=1) %}<ol class="ai-suggestions" start="{{ start }}">{% for c in items %}<li><span dir="auto">{{ c.diagnosis_name|condition_label }}</span> — {{ t('confidence') }}: <bdi dir="ltr">{{ c.confidence|ai_score }}</bdi></li>{% endfor %}</ol>{% endmacro %}
 {% if latest_success %}<h3>{{ t('latest_success') }}</h3>
 {% if latest_success.model_name.startswith('SIMULATED') %}<p dir="auto">{{ latest_success.model_name }}</p>{% endif %}
 {% if latest_success.assisted_triage %}{% set triage = latest_success.assisted_triage %}
@@ -40,7 +40,7 @@
 </section>{% else %}<p>{{ t(latest_success.triage_level) }}</p>{% endif %}
 <p>{{ t('ai_score_help') }}</p>{{ suggestions(candidates[:3]) }}
 {% if candidates|length > 3 %}<details><summary>{{ t('ai_more_suggestions') }}</summary>{{ suggestions(candidates[3:], start=4) }}</details>{% endif %}
-<details><summary>{{ t('ai_report_details') }}</summary><p dir="auto">{{ latest_success.summary }}</p><p dir="auto">{{ latest_success.rationale }}</p><p dir="auto">{{ latest_success.limitations }}</p><p>{{ t('quality_warning') }}</p>{% for c in candidates if c.rationale %}<p dir="auto">{{ c.diagnosis_name }}: {{ c.rationale }}</p>{% endfor %}</details>{% endif %}
+<details><summary>{{ t('ai_report_details') }}</summary><p dir="auto">{{ latest_success.summary|ai_narrative }}</p><p dir="auto">{{ latest_success.rationale|ai_narrative }}</p><p dir="auto">{{ latest_success.limitations|ai_narrative }}</p><p>{{ t('quality_warning') }}</p>{% for c in candidates if c.rationale %}<p dir="auto">{{ c.diagnosis_name|condition_label }}: {{ c.rationale }}</p>{% endfor %}</details>{% endif %}
 {% if case.status == 'submitted' %}<form method="post" action="{{ url_for('transition',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="action" value="claim"><button>{{ t('claim') }}</button></form>{% endif %}
 {% if case.status == 'reviewed' %}{% for action,key in [('revise','revision'),('close','close')] %}<form method="post" action="{{ url_for('transition',case_id=case.case_id) }}">{{ token() }}<input type="hidden" name="action" value="{{ action }}">{% if action == 'close' %}<input type="hidden" data-confirm="{{ t('confirm_close') }}">{% endif %}<button>{{ t(key) }}</button></form>{% endfor %}{% endif %}
 {% if case.status == 'in_review' %}

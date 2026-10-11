@@ -1,5 +1,23 @@
 # Hacklanta teledermatology MVP — development instructions
 
+## PaliDerm branding and Arabic interface update (2026-10-11)
+
+The user now requests PaliDerm branding, restrained Palestinian flag accents,
+removal of the visible word “prototype”, and a functional Arabic interface. Keep
+the existing synthetic-use/clinical-validation disclaimer, AI clinician-review
+notice and emergency guidance in both languages. Historical requirements and
+technical identifiers remain documented; do not change models/notebooks.
+
+Use the small centralized EN/AR catalog, CSRF-protected browser language selection,
+and page lang/dir attributes. Translate display labels/model condition groups only;
+keep schema/API/enums/model artifacts in English. Preserve entered names, symptoms,
+notes and clinician messages exactly in either language. As explicitly confirmed
+by the user, only usernames/email addresses and telephone digits require Latin
+characters/0–9, with visible translated hints, LTR controls and backend validation.
+Passwords remain unrestricted Unicode. Existing records are never transliterated
+or silently rewritten. Software catalog/RTL-markup/persistence tests do not replace
+real-device Arabic visual, keyboard and screen-reader verification.
+
 ## Current user-authorized prototype triage/reset update (2026-10-11)
 
 The latest request authorizes a small illustrative deterministic triage policy after existing SCIN inference. This supersedes earlier prohibitions on adding rules only for this limited prototype feature; do not develop/train/change any model or notebook. Use structured answers, emergency precedence, an editable mapping of the actual 14 model labels and a configurable unvalidated uncertainty flag. Preserve clinician control; routine with missing/uncertain inputs must display “Priority undetermined — manual review needed”. All output is labeled “AI-assisted triage — prototype; clinician review required.” Exact rules and limitations are documented in README. This is not clinical validation or full completion of AT-06.

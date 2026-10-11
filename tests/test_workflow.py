@@ -400,7 +400,9 @@ class WorkflowTests(WorkflowSupport, unittest.TestCase):
         arabic_app = create_app({**self.config, 'APP_LOCALE':'ar'})
         page = arabic_app.test_client().get('/login').get_data(as_text=True)
         self.assertIn('lang="ar" dir="rtl"', page)
-        self.assertIn('translations and full RTL verification are pending', page)
+        self.assertIn('تسجيل الدخول', page)
+        self.assertIn('PaliDerm', page)
+        self.assertNotIn('translations and full RTL verification are pending', page)
         self.assertIn('dir="auto"', self.client.get('/patients/1').get_data(as_text=True))
 
 
