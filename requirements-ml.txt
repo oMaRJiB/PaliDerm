@@ -1,0 +1,9 @@
+# Optional notebook/training dependencies; Flask startup does not import these.
+torch==2.14.1
+torchvision==0.29.1
+numpy==2.5.4
+pandas==3.0.6
+scikit-learn==1.9.1
+pyarrow==26.0.0
+# Reuse the app's Pillow 12.x dependency; do not force a conflicting exact pin.
+Pillow>=12.0.0,<13

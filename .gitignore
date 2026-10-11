@@ -252,3 +252,7 @@ storage/
 .idea/
 
 AI TELEDERMATOLOGY & SKIN INTELLIGENCE PLATFORM.pdf
+# Derived SCIN checkpoints/reports; preserve locally without tracking model binaries.
+notebooks/scin_runs/
+notebooks/model_artifacts/
+

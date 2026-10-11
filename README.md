@@ -178,3 +178,21 @@ Signup uses Female, Male, or Unknown / Prefer not to say. The existing field nam
 Fernet encrypts patient demographics/contact, complaint/duration, structured symptoms/notes, released/private review text/referral/follow-up, diagnosis/treatment text, stored analysis snapshots/narratives and image originals. IDs, relationships, operational dates/status/priority/certainty/quality and account usernames/password hashes remain queryable metadata. This does not encrypt the entire SQLite file or OS memory/swap. Structured medical-history storage is absent; history written in existing notes is encrypted. Patient service results now exclude private clinician notes and unconfirmed analysis history, in addition to existing template restrictions. Authentication retains scrypt, database-owned roles/ownership, session rotation/HttpOnly/SameSite, CSRF, loopback checks and no-store responses. Production throttling, MFA/recovery, comprehensive audit and key-rotation tooling remain pending.
 
 The previously requested plaintext synthetic test-password file remains Git-ignored and 0600; patient display names were removed from it and its database path updated. All six documented test logins were rechecked after migration, and all seven database accounts were preserved. Never put actual encryption keys or passwords into tracked files/command arguments/logs.
+
+## SCIN multimodal model pipeline
+
+The explicitly requested optional PyTorch pipeline lives in `scin_ml/` and
+`notebooks/SCIN_MODEL.IPYNB`; it preserves the cleaned artifact, EDA and prior
+preprocessing exports. Install/run from the repository root:
+
+```sh
+.venv/bin/python -m pip install -r requirements-ml.txt
+.venv/bin/python -m scin_ml --output-dir notebooks/scin_runs/my_run --exclude-missing-primary
+```
+
+One original case has no primary image; the explicit flag records its exclusion
+without changing the source. Outputs include the best model, train-only encoder,
+class/config JSON, evaluation reports and an independently loadable `app_model/`
+bundle. Flask's AI adapter is unchanged; complete SCIN metadata mapping is still
+required before connecting this model to app intake. See
+[SCIN pipeline, commands and inference interface](docs/SCIN_PIPELINE.md).
