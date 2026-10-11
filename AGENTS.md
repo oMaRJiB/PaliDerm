@@ -1,56 +1,80 @@
 # Hacklanta teledermatology MVP — development instructions
 
-## PaliDerm branding and Arabic interface update (2026-10-11)
+## Current scope and documentation authority (2026-10-11)
 
-The user now requests PaliDerm branding, restrained Palestinian flag accents,
-removal of the visible word “prototype”, and a functional Arabic interface. Keep
-the existing synthetic-use/clinical-validation disclaimer, AI clinician-review
-notice and emergency guidance in both languages. Historical requirements and
-technical identifiers remain documented; do not change models/notebooks.
+User instructions override the original long-term requirements below. The local
+schema-supported application is the delivery target; preserve unsupported full-MVP
+requirements as pending, never as a reason to stop independent work. Keep only
+three project Markdown documents: this file for development rules, [README.md](README.md)
+for setup/operations/architecture/inference, and [implementation.md](implementation.md)
+for the original plan, current acceptance status, verification and migration
+proposals. Do not generate separate progress reports or duplicate guides. Git
+history retains earlier generated documentation and chronological test logs.
 
-Use the small centralized EN/AR catalog, CSRF-protected browser language selection,
-and page lang/dir attributes. Translate display labels/model condition groups only;
-keep schema/API/enums/model artifacts in English. Preserve entered names, symptoms,
-notes and clinician messages exactly in either language. As explicitly confirmed
-by the user, only usernames/email addresses and telephone digits require Latin
-characters/0–9, with visible translated hints, LTR controls and backend validation.
-Passwords remain unrestricted Unicode. Existing records are never transliterated
-or silently rewritten. Software catalog/RTL-markup/persistence tests do not replace
-real-device Arabic visual, keyboard and screen-reader verification.
+- Reuse Flask/Jinja/SQLite, cohesive CaseWorkflow/AuthService/ImageStorage/AI
+  adapters and ordinary helpers. Thin routes, presentation-only templates; no
+  frontend framework, generic repository layer or class-per-page organization.
+- Preserve source attachments, notebooks, cleaned artifacts, trained models,
+  encryption keys and unrelated changes. No model development/training/downloads,
+  external deployment or push is authorized by maintenance tasks. `scin_ml/` is
+  used by both model notebooks, inference reconstruction and tests; keep it.
+- Supplied schema.sql remains v2; the explicit Account v3 and encrypted v4
+  extensions are applied. Runtime requires v4 and verifies its existing key.
+  Initialize only absent databases; migrate existing plaintext v2/v3 by explicit
+  verified copy to an unused destination. Never replace a key or fall back to
+  plaintext. README documents migration, protected fields and security limits.
+- Use actual patient-only signup/login/logout, Werkzeug scrypt, server-owned
+  roles/ownership/assignment, session rotation, CSRF and loopback-only access.
+  Provider/worker/existing-record accounts are operator-provisioned. No identity
+  switching dropdown or public privileged signup. Worker grants/attribution,
+  structured history, durable submission revisions and production controls remain
+  pending; needs-information requests persist but patient resubmission is blocked.
+- Preserve exact original image bytes/EXIF/GPS and UTF-8 authored text. Images stay
+  encrypted outside static and are decrypted in memory only after authorization.
+  Hashes describe decrypted originals. No custom pixel cap or metadata stripping;
+  retain decode protections and configurable file/count limits. Intake is one
+  scrollable form with native/live camera, upload previews and atomic save/submit.
+- Logical gender values are female/male/unknown; derive [1,0,0]/[0,1,0]/[0,0,1].
+  Safely archive unrecognized legacy values encrypted. Checkbox groups preserve
+  NULL versus explicit No; confirmation makes unchecked answers No. Patient SCIN
+  extras use the existing encrypted symptom envelope. Derive age from DOB at
+  submission, reuse profile sex at birth and ask duration in saved ranges.
+- Omar selected notebooks/SCIN_custom_model.keras with adjacent encoder/classes.
+  MODEL_PATH selects it; empty disables inference. Keep typed, lazy, replaceable
+  adapters, exact encrypted attempt snapshots, timeout/retry/history and manual
+  review independent. Require missing binary inputs; never impute unknown as No.
+- Only the explicitly authorized deterministic triage rules in README are active:
+  shortness of breath→emergency; rapid worsening or fever+discharge→urgent;
+  top Malignancy/Precancer→urgent. Never lower symptom priority. Missing/invalid/
+  uncertain/unmapped output or missing required answers require manual review;
+  the configurable 0.5 demo uncertainty threshold is unvalidated. Routine with
+  review needed displays undetermined. Preserve clinician control and disclaimer.
+  Full independent pre-upload/AI-unavailable emergency screening remains pending.
+- Brand the visible interface PaliDerm with restrained Palestinian flag accents;
+  omit the visible word “prototype” but keep synthetic-use/clinical-validation,
+  emergency and clinician-review notices. Keep every UI label/error/notice in the
+  centralized EN/AR catalog, CSS logical properties, responsive native controls,
+  keyboard focus and labeled priorities. Browser language controls use CSRF and
+  safe redirects; en/ltr and ar/rtl are presentation only. Names/notes/passwords
+  accept Unicode; only usernames/email and phone digits require Latin/0–9.
+  User-authored text is not translated. Store identifiers/enums in English.
+  Device-local event times retain UTC storage/fallback; calendar dates never shift.
+- Reset only an explicitly confirmed demo.sqlite3 and its dedicated generated
+  uploads. Keep keys/code/notebooks/models/source backups. Fresh random test
+  credentials belong only in ignored mode-0600 instance/test-accounts.txt; rotate
+  file-managed sessions, or require operator rotation of explicit SECRET_KEY.
+- Report tests actually run. HTTP/DOM-double/catalog checks are not physical
+  browser/mobile/camera/Arabic RTL/assistive-technology verification or clinical
+  validation. Track AT-01–AT-12 individually in implementation.md. Do not claim
+  the full MVP or complete Arabic support while required checks remain pending.
 
-## Current user-authorized prototype triage/reset update (2026-10-11)
+## Original requirements retained
 
-The latest request authorizes a small illustrative deterministic triage policy after existing SCIN inference. This supersedes earlier prohibitions on adding rules only for this limited prototype feature; do not develop/train/change any model or notebook. Use structured answers, emergency precedence, an editable mapping of the actual 14 model labels and a configurable unvalidated uncertainty flag. Preserve clinician control; routine with missing/uncertain inputs must display “Priority undetermined — manual review needed”. All output is labeled “AI-assisted triage — prototype; clinician review required.” Exact rules and limitations are documented in README. This is not clinical validation or full completion of AT-06.
-
-Direct Flask CLI and the launcher may select the same existing private instance/encryption.key when no environment/config key source is supplied; never generate a replacement or fall back to plaintext. The authorized local demo reset may clear demo records/accounts/generated uploads and reseed synthetic test logins, preserving encryption key, code, notebooks, models and original migration sources. Guard it to demo.sqlite3 and its dedicated sibling uploads directory. Keep generated plaintext demo passwords only in ignored mode-0600 instance/test-accounts.txt. Reset invalidates default file-managed sessions; an externally configured SECRET_KEY must be rotated by its operator. See README for manual reset/start/stop commands.
-
-## Patient questionnaire update — 2026-10-11
-
-Omar authorized patient entry of SCIN questions, select-all checkbox controls,
-profile-derived sex at birth/age group, and directly selected duration ranges.
-Reuse the encrypted `Symptom.encrypted_answers` envelope: preserve the six existing
-answers and add a nested `model_metadata` mapping, without changing SQL v4 or the
-source schema. Unanswered boxes stay NULL; an explicit group confirmation makes
-unchecked answers No, while previously recorded No values are retained. Patient
-draft edits are authorized; submitted records remain frozen. The existing canonical
-profile `sex` field is reused as sex at birth per Omar's instruction; retain its
-English enum values and historical data. Derive age for the submission date, with
-the saved unknown category for missing DOB or ages outside the trained bands.
-Missing model answers still block only inference. No notebook, model, training,
-automated clinical policy or external deployment changes are authorized.
-
-## Authorized saved-model integration — 2026-10-11
-
-Omar explicitly selected `SCIN_custom_model.keras` for application inference.
-This supersedes the earlier unconfigured application default below; it does not
-authorize model development, training, downloads or notebook changes. Select the
-saved bundle through administrator-only `MODEL_PATH` (empty disables inference).
-Preserve the typed adapter boundary, encrypted image/snapshot storage and independent
-clinician review. Require all missing model inputs explicitly; never fill unknown
-binary symptoms with zero. Supplemental provider answers belong to the encrypted
-analysis snapshot, not a silent edit of the submitted questionnaire. Model scores
-remain unconfirmed and uncalibrated; no clinical priority policy is supplied.
-Other pending MVP requirements remain required and must not be claimed complete.
+The sections below preserve the original development instructions and complete
+plan. Historical first-run defaults (unconfigured AI/demo identities/v2, minimal
+CSS, EXIF stripping and pending Arabic translation) are superseded only by the
+explicit current decisions above. Their underlying safety, data-integrity and
+full-MVP requirements remain in force where applicable.
 
 ## Goal and authority
 Build a working, mobile-first patient-to-clinician teledermatology workflow for Omar's first Hacklanta submission. Omar is implementing the AI separately. Deliver the application, database integration, and a replaceable AI boundary; do not develop, train, download, or select an AI model on his behalf.
@@ -318,43 +342,3 @@ The MVP is complete when an authorized patient or healthcare worker can submit a
 All mandatory acceptance tests must pass. Unimplemented components, simulated functionality, and known limitations must be explicitly documented.
 
 The prototype shall use fictional patient records and demonstration imagery. AI screening outputs are not clinically validated and shall not be presented as independent medical diagnoses or treatment decisions.
-
-## First-run delivery override and English/Arabic architecture (2026-10-10)
-
-The user's first-run scope takes precedence over broader completion criteria above. Deliver a functioning local schema-supported prototype now; preserve all broader requirements as pending. Use plain server-rendered HTML, native controls and minimal usability CSS. No external deployment or GitHub push is authorized. The unchanged root `schema.sql` remains authoritative SQLite user_version 2. No additive migration has been applied. Do not let missing medical history, durable identities/worker attribution or submission revisions block independent schema-supported work.
-
-All interface text, including labels, notices, buttons, statuses and validation errors, belongs in the small centralized `backend/i18n.py` catalog. Keep code identifiers, API names, SQL identifiers and stored enums in English. English is the implemented interface. Prepare `APP_LOCALE=en|ar` and page-level `lang`/`dir` (English/ltr, Arabic/rtl); Arabic labels and complete RTL verification remain pending. Use UTF-8 throughout. Validate required free text using a blank check without stripping or normalizing stored content. Render user-entered text with `dir="auto"`; email, phone, dates and technical identifiers use ltr. Verify exact Arabic text across save, real process restart, retrieval and rendered HTML. Do not claim complete Arabic support based on storage or locale plumbing alone. No translation service or internationalization framework is needed.
-
-`docs/REQUIREMENTS.md` records implementation boundaries, the white-paper Sections 1.2/1.3 reconciliation, and proposed (unapplied) additive migrations. `docs/TEST_RESULTS.md` tracks each AT-01 through AT-12 separately. Needs-information requests persist as reviews, but patient resubmission remains disabled until durable submission revisions exist. The developer fixture adapter is tests-only, not demonstration model inference. Local identity selection is intentionally available only over loopback and is unsuitable for public deployment. Preserve all source attachments and unrelated changes.
-
-## Second-pass authentication and service organization (2026-10-10)
-
-The user explicitly authorized the minimal additive authentication migration and object-oriented clarification. The original `schema.sql` remains v2; runtime databases now require v3 after `auth_migration.sql` adds Account. Existing v2 databases must be migrated explicitly with a consistent backup, preserving all clinical records/images. See `docs/AUTH_MIGRATION.md`. This supersedes first-run statements that no migration/accounts exist; all other unsupported clinical/history/worker/revision/safety requirements remain pending.
-
-Normal application access uses password login/logout and patient-only signup, never a demo identity selector. Public signup creates a new Patient and patient Account transactionally; provider/worker accounts and links to existing patient records use the local `provision-account` CLI only. Use Werkzeug scrypt hashes, parameterized SQL, server-side Account role/ownership checks and CSRF for all state-changing forms. Do not create default/shared passwords. Retain loopback-only operation and document missing production authentication features.
-
-Keep routes thin, templates presentational and minimal navigation role-appropriate. CaseWorkflow, AuthService and ImageStorage are cohesive classes in the existing backend directory; simple validation/transaction helpers remain ordinary functions. Preserve the typed unconfigured AI boundary and Arabic readiness. Do not add classes per page, generic repository frameworks or extra folders simply for classes. `docs/ARCHITECTURE.md` explains the request lifecycle using Tkinter comparisons. No deployment/push is authorized.
-
-## Presentation scope update (2026-10-10)
-
-The user's updated scope supersedes the earlier minimal-CSS restriction: keep Flask/Jinja and implement a restrained professional medical interface using system fonts, off-white/white surfaces, dark text, muted teal/navy accents, modest rounding and responsive spacing. Share `static/app.css` and `static/forms.js` through base.html. No frontend framework, design-system dependency, animations or decorative gradients. Preserve the existing CaseWorkflow/AuthService/ImageStorage/AI adapter separation and native-form fallback. Enhanced forms must preserve inputs after server errors, prevent repeated clicks, and navigate only after server confirmation. Keep translated UI text, logical CSS properties, labeled priorities, UTF-8/free-text directions and the pending Arabic translation/RTL status. No schema migration or inference change is part of this presentation pass. Original blocked requirements remain pending.
-
-## Camera, intake and original-image update (2026-10-10)
-
-The latest user instruction overrides the earlier metadata-stripping and custom image-pixel-limit requirements. Preserve newly uploaded JPEG/PNG bytes exactly, including EXIF/GPS, orientation and other metadata when present. Do not infer location or implement outbreak detection. Previous stripped metadata cannot be reconstructed. Remove MAX_IMAGE_PIXELS from application configuration and patient-facing pixel jargon; retain file-size/count validation, decode validation and Pillow's built-in decompression protection. No resizing is needed by the unconfigured application; future model preprocessing must preserve the original source and document the exact transform/bytes used.
-
-After initial draft creation, show all intake sections together on one scrollable page, with atomic Save draft / Submit behavior covering questionnaire, body sites, new photos and consent. Provide native phone-camera capture, optional live camera with permission/error handling, and existing-file selection. Browser capture may provide no source EXIF/GPS; retain what actually exists without fabricating metadata. Hide internal case numbers from patient display labels; retain technical IDs for routes, ownership checks and clinician use. Use responsive layouts for wide desktops and narrow portrait phones. Preserve the schema, class boundaries, Arabic readiness and unconfigured AI; no deployment/push. Real browser/device and Arabic RTL checks remain distinct from software tests.
-
-## Encrypted persistence and gender update (2026-10-10)
-
-The latest user authorizes encryption/gender changes and a safe additive migration. Keep schema.sql v2 and auth_migration.sql v3 unchanged. Runtime v4 adds only encrypted symptom answers, encrypted duration, encrypted legacy gender archive and a key-check record, plus plaintext-write guards. Store patient PII, complaint/duration, structured symptoms/notes, clinician review notes/messages/referral/follow-up, diagnosis/treatment narratives, persisted analysis snapshots/narratives and original images using authenticated cryptography/Fernet encryption. IDs/statuses/operational enums/dates/account usernames/password hashes remain queryable metadata; this is field/file encryption, not whole-database or OS-memory encryption.
-
-Require an environment-managed ENCRYPTION_KEY or explicitly selected ENCRYPTION_KEY_FILE; no startup key generation or plaintext fallback. Migration copies plaintext source DB into RAM, transforms/verifies fields/images and atomically publishes a separate encrypted destination. Preserve original source records/files for rollback and report that those originals/backups remain plaintext until separately secured/removed. Do not silently migrate existing DBs on startup. Use the documented run-local.sh/environment configuration for the encrypted dataset. Missing/wrong keys and corrupt ciphertext fail closed; decrypt image bytes in memory only after role/ownership authorization. No keys, patient text or image bytes in logs or tracked files.
-
-Replace free-text gender with Female/Male/Unknown or Prefer not to say; keep API/schema name sex and canonical encrypted logical values female/male/unknown. One-hot order is female/male/unknown. Normalize safe legacy values; archive unrecognized originals encrypted rather than deleting them. Structured symptom encodings preserve NULL vs 0. No structured medical-history table is introduced: history within supported notes is encrypted; the existing schema gap remains explicit.
-
-Keep existing typed AI signatures, unconfigured state and clinician independence. Only encryption-related persistence and documentation may change around that boundary; no model development/inference/training. Add focused security/migration/encoding tests and concise code documentation. Documentation-only edits must not alter working logic (AST comparison used); no unrelated formatting, restructuring or cosmetic work. Follow docs/ENCRYPTION.md and docs/TEST_RESULTS.md for actual migration and remaining limitations. No external deployment/push.
-
-## Explicit SCIN ML scope update (2026-10-11)
-
-The user now explicitly authorizes the SCIN multimodal PyTorch pipeline; this supersedes the earlier prohibition on model development only within this requested pipeline. Consume the existing SCIN_cleaned.pkl/X_metadata/X_images/Y/target_classes without repeating EDA, cleaning or label selection. Preserve SCIN_EDA.ipynb and existing preprocessing artifacts. Append notebook pipeline cells and keep reusable code in scin_ml; Flask imports no ML dependencies and its existing typed/unconfigured AI boundary remains unchanged. Use primary image_1 only, training-only categorical encoding, case-grouped splits, soft-label cross entropy, the specified MobileNetV3-Small fusion architecture and two-phase optimization. One existing missing-primary row requires an explicit recorded eligibility policy; never silently substitute secondary images or modify the source artifact. Save/load the best model with its exact encoder/class/config contract for later authorized app access. Report actual training/test results separately from synthetic software checks; no clinical-validation claim, deployment or push. See docs/SCIN_PIPELINE.md.

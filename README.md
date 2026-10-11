@@ -1,5 +1,11 @@
 # PaliDerm
 
+Project documentation lives in three original files: this README for setup and
+developer reference, [AGENTS.md](AGENTS.md) for development instructions, and
+[implementation.md](implementation.md) for the full plan, current requirements,
+acceptance results and pending schema extensions. Earlier generated guides and
+chronological reports remain available in Git history.
+
 The interface is branded **PaliDerm** with Palestinian flag accent colors. Its
 English/العربية buttons change the interface language and page direction, including
 login/signup, intake, queue, clinical review, errors, notices and model-label
@@ -59,7 +65,7 @@ For an **existing plaintext v2/v3 database**, stop the old server and migrate in
 ./run-local.sh
 ```
 
-This copies data in memory, applies the additive v4 extension, encrypts clinical values and images, verifies every decoded clinical field/image hash and foreign keys, rebuilds SQLite pages, then publishes the destination directory. Sources are never overwritten. Multiple SQL image rows may share one source file; migration preserves every row and encrypts each distinct file once, rejecting conflicting hashes or MIME metadata. Original plaintext sources/backups remain for rollback and need secure archival/removal after verification; they are never used by the encrypted launcher. Unknown source schema extensions are refused rather than silently leaving their data plaintext. See [encryption/migration details](docs/ENCRYPTION.md); [the original authentication migration](docs/AUTH_MIGRATION.md) remains documented separately.
+This copies data in memory, applies the additive v4 extension, encrypts clinical values and images, verifies every decoded clinical field/image hash and foreign keys, rebuilds SQLite pages, then publishes the destination directory. Sources are never overwritten. Multiple SQL image rows may share one source file; migration preserves every row and encrypts each distinct file once, rejecting conflicting hashes or MIME metadata. Original plaintext sources/backups remain for rollback and need secure archival/removal after verification; they are never used by the encrypted launcher. Unknown source schema extensions are refused rather than silently leaving their data plaintext. See [encryption and migration details](#encryption-and-migrations).
 
 Open http://127.0.0.1:5000/login. Startup checks runtime `user_version=4` and the matching environment key. An existing plaintext database is refused with migration instructions. Source attachments and the base schema are preserved. Back up encrypted DB/uploads and the encryption key separately; key loss makes encrypted data unreadable.
 
@@ -83,7 +89,7 @@ Reset transactionally clears demo accounts and clinical records; it never delete
 
 This deletes the configured demo's cases, reviews, AI attempts, accounts and old generated images, then seeds two patients, two clinicians, one submitted synthetic case/image and five logins. Each login receives a fresh random password. Open `instance/test-accounts.txt` in your editor for patient1, patient2, clinician1, clinician2 and worker1 usernames/plaintext passwords (local demo only, mode 0600, Git-ignored). Previously issued passwords stop working. Worker-assisted submission is still unavailable. Do not run `provision-account` again for these usernames.
 
-The default file-managed session secret rotates to invalidate existing browser sessions; log in again after restart. If you explicitly set `SECRET_KEY`, change that environment secret yourself before restarting. Encryption key, code, notebooks, models, source attachments and legacy migration backups stay intact. Reset does **not** erase old plaintext migration sources/backups; see `docs/ENCRYPTION.md` for that separate archive/removal concern. Purging is allowed only for the demo database's dedicated sibling `uploads` directory and removes generated image filenames, preserving unrelated files.
+The default file-managed session secret rotates to invalidate existing browser sessions; log in again after restart. If you explicitly set `SECRET_KEY`, change that environment secret yourself before restarting. Encryption key, code, notebooks, models, source attachments and legacy migration backups stay intact. Reset does **not** erase old plaintext migration sources/backups; see [encryption and migrations](#encryption-and-migrations) for that separate archive/removal concern. Purging is allowed only for the demo database's dedicated sibling `uploads` directory and removes generated image filenames, preserving unrelated files.
 
 Direct Flask CLI commands now select the same existing `instance/encryption.key` as the launcher when no key source is specified. You do not need to export it again on this installation. Explicit environment/configuration values take precedence; a missing/wrong key still fails closed, and no new encryption key is generated. `.env` is not automatically loaded.
 
@@ -130,7 +136,7 @@ Use 12–256 character passwords and unique 3–64 character usernames (letters/
 
 Navigation is ordinary role-appropriate links/buttons: Home for everyone, My cases/New case for patients, Clinician queue for providers, and a CSRF-protected POST Logout for authenticated users. Every protected backend request still checks role/ownership; hiding a link is not authorization.
 
-The signed session stores Account ID only. The server reloads active status, role and patient/provider linkage on each request. Login/signup rotate the session/CSRF token; logout clears the session. Unknown usernames and wrong passwords get the same error. Loopback/Host restrictions remain. This is actual local password authentication, with production features still missing (reset/recovery, verification/MFA, throttling, durable session revocation and comprehensive audit). Do not expose it publicly or use real data.
+The signed session stores the Account ID, CSRF token and language preference, never clinical data or passwords. The server reloads active status, role and patient/provider linkage on each request. Login/signup rotate the session/CSRF token; logout clears authentication and retains only a valid language preference. Unknown usernames and wrong passwords get the same error. Loopback/Host restrictions remain. This is actual local password authentication, with production features still missing (reset/recovery, verification/MFA, throttling, durable session revocation and comprehensive audit). Do not expose it publicly or use real data.
 
 1. Log in with a provisioned patient account or sign up a new fictional patient.
 2. Create a draft with a nonblank complaint; enter duration or leave it unknown.
@@ -205,22 +211,65 @@ Run the foreground server from this repository in an ordinary terminal:
 
 That terminal stays occupied and shows request logs. Stop it with **Ctrl-C in that same terminal**; close/reopen a browser tab without stopping the server. Ctrl-C stops Flask; it does not delete SQLite or uploads. Relaunch with the same command to keep saved data. Do not use debug/reloader or multiple server processes with the local AI runner.
 
-At the 2026-10-11 branding/Arabic verification, the restarted server is PID **9580**, running in a Codex-managed background process without an interactive terminal. It uses the encrypted dataset and selected SCIN model. To take over in your own terminal:
+The last verified server ran in a Codex-managed background process without an interactive terminal. Process IDs change; inspect the current listener before taking over in your own terminal:
 
 ```sh
 lsof -nP -iTCP:5000 -sTCP:LISTEN
 # Verify the Python process is this app. Use its current numeric PID here:
-kill -TERM 9580
+kill -TERM <PID>
 ./run-local.sh
 ```
 
 In your terminal, **Ctrl-C** stops the foreground server; running `./run-local.sh` restarts it with persisted encrypted records/images. PID values change on restart. No installed service, nohup, external hosting or deployment was configured.
 
-See [architecture and Tkinter comparison](docs/ARCHITECTURE.md) for the folder map and route → service → database → template flow. See [AI integration](docs/AI_INTEGRATION.md) for the exact typed adapter and configuration seam; [requirements](docs/REQUIREMENTS.md) for implemented/pending features, white-paper reconciliation and migration proposals; and [test results](docs/TEST_RESULTS.md) for individual AT-01 through AT-12 results. The local schema-supported workflow and password authentication are functional; the full MVP remains incomplete. Nothing was deployed externally or pushed to GitHub.
+See [structure and request flow](#structure-and-request-flow), [inference interface](#inference-interface), [requirements/current status](implementation.md#requirements-and-current-status), [white-paper reconciliation](implementation.md#white-paper-reconciliation), [pending schema extensions](implementation.md#pending-schema-extensions) and [verification record](implementation.md#verification-record), including AT-01 through AT-12. The local schema-supported workflow and password authentication are functional; the full MVP remains incomplete. Nothing was deployed externally or pushed to GitHub.
+
+## Structure and request flow
+
+The existing folders separate public assets, presentation, application behavior and
+private data; reducing folder count would obscure those responsibilities. Backend
+behavior uses a few cohesive classes, with ordinary functions for small helpers.
+
+| Location | Responsibility |
+|---|---|
+| `app.py` | Flask `create_app()` entry point; thin routes, request/session/CSRF checks, responses and operator CLI commands. |
+| `backend/services.py` | Request-scoped `CaseWorkflow`: profiles, case access, queue, intake, submission, assignment, legal transitions and atomic clinician reviews. |
+| `backend/auth.py` | `AuthService`: patient signup, password verification, database-owned role links, sessions and operator provisioning. |
+| `backend/images.py` | `ImageStorage`: image decoding, private identifiers, original-byte hashes, encrypted writes and authenticated in-memory reads. |
+| `backend/db.py`, `security.py` | SQLite connections/transactions/schema checks and Fernet field/file encryption. |
+| `backend/validation.py`, `preprocessing.py` | Small validation helpers; gender/symptom encoding and `SCINQuestionnaire` category/checkbox validation. |
+| `backend/ai/` | Typed adapter, saved-model adapters/preprocessing, attempt runner and separate deterministic triage; `backend/safety.py` retains the independent safety boundary. |
+| `backend/i18n.py`, `demo.py` | Central EN/AR display catalog and explicitly synthetic seed/reset helpers. |
+| `templates/` | Jinja presentation; shared `base.html`/`macros.html`, scrollable intake and patient/clinician result pages. |
+| `static/` | Shared `app.css`, progressive form/image-preview behavior in `forms.js`, optional live capture in `camera.js`. |
+| `instance/encrypted/` | Active database and encrypted `uploads/`, outside public static assets. Private key/session files and ignored demo credentials live under `instance/`. |
+| `schema.sql`, `auth_migration.sql`, `encryption_migration.sql` | Preserved base v2 and explicit v3/v4 extensions. |
+| `tests/`, `notebooks/` | Focused application/isolated HTTP tests; separately maintained notebooks and saved model artifacts. |
+
+A patient intake request follows **route → service → database → template**:
+
+1. The browser posts `/cases/<id>/intake` with form values, files, consent and CSRF.
+2. The request hook resolves the active account/role through `AuthService` and checks CSRF. The route delegates to `CaseWorkflow.save_intake`.
+3. The service authorizes ownership/state, validates answers and opens a `db.py` transaction. `ImageStorage` validates/encrypts originals; SQL stores their identifiers/MIME/source hashes. Questionnaire, sites, consent and submission commit together; failures roll back and remove new files.
+4. After commit, the route redirects to the case GET route, which requests authorized service data and passes it to `case.html`. Jinja escapes free text and renders translated labels; templates never authorize or write data.
+
+Private images follow the same authorization path, then return decrypted bytes with
+no-store headers rather than HTML. Inference runs outside database transactions;
+its encrypted attempt history is independent of clinician review. An unavailable
+model never prevents manual review. The older individual draft/image/submit routes
+remain supported, while the UI uses combined intake.
+
+For Tkinter, `create_app()` resembles creating the root and binding commands; a
+route is the button callback reading Entry/Combobox values; services are controller
+objects; `db.py` is the sqlite3 persistence code; Jinja/CSS replace widget creation
+and layout. Optional JavaScript handles temporary widget-like behavior such as
+previews and disabling a pending button. A web request ends after its response,
+so the current identity belongs to a request-scoped service, not a shared global
+object. Durable patient state belongs in SQLite/private storage, not browser state.
 
 ## Presentation and browser behavior
 
-The existing backend classes remain in their original folders; see `docs/ARCHITECTURE.md` for responsibilities and the Tkinter comparison. Shared `static/app.css` supplies responsive medical styling and accessible focus states. `static/forms.js` adds pre-upload previews/removal, body-site selection, submission states, inline server errors and close confirmation. `static/camera.js` handles optional live capture, permissions and camera track cleanup. Forms remain usable without JavaScript. No new application dependency or schema change was introduced.
+The existing backend classes remain in their original folders; see [structure and request flow](#structure-and-request-flow) for responsibilities and the Tkinter comparison. Shared `static/app.css` supplies responsive medical styling and accessible focus states. `static/forms.js` adds pre-upload previews/removal, body-site selection, submission states, inline server errors and close confirmation. `static/camera.js` handles optional live capture, permissions and camera track cleanup. Forms remain usable without JavaScript. No new application dependency or schema change was introduced.
 
 For this workspace, already-provisioned synthetic account credentials are in the Git-ignored `instance/test-accounts.txt` (mode 0600); these are local test credentials, not built-in application defaults. Do not rerun provisioning for those usernames. The database stores hashes only. Resetting the demo removes accounts as well as cases.
 
@@ -230,13 +279,75 @@ Native phone capture uses `capture="environment"` alongside a separate existing-
 
 Run optional camera lifecycle logic checks with `node tests/camera_smoke.mjs`; as with forms_smoke.mjs these use API doubles, not real hardware. Metadata-preservation and single-page intake tests are in `tests/test_intake.py`. After code changes, restart your foreground Flask server with Ctrl-C and the launch command above.
 
-## Gender, preprocessing and encryption boundaries
+## Encryption and migrations
 
 Signup uses Female, Male, or Unknown / Prefer not to say. The existing field name `sex` is retained for compatibility; logical values female/male/unknown are encrypted at rest. `backend/preprocessing.py:gender_one_hot` derives [1,0,0], [0,1,0] or [0,0,1]. Legacy unrecognized free text becomes unknown while its exact original is archived encrypted. `symptom_answers` validates browser values and `symptom_vector` preserves None in the documented fixed order. These helpers do not select a clinical threshold or supply missing saved-model features.
 
 Fernet encrypts patient demographics/contact, complaint/duration, structured symptoms/notes, released/private review text/referral/follow-up, diagnosis/treatment text, stored analysis snapshots/narratives and image originals. IDs, relationships, operational dates/status/priority/certainty/quality and account usernames/password hashes remain queryable metadata. This does not encrypt the entire SQLite file or OS memory/swap. Structured medical-history storage is absent; history written in existing notes is encrypted. Patient service results now exclude private clinician notes and unconfirmed analysis history, in addition to existing template restrictions. Authentication retains scrypt, database-owned roles/ownership, session rotation/HttpOnly/SameSite, CSRF, loopback checks and no-store responses. Production throttling, MFA/recovery, comprehensive audit and key-rotation tooling remain pending.
 
 The plaintext synthetic test-password file remains Git-ignored and 0600. The subsequent authorized demo reset replaced older accounts with five freshly generated logins, all verified. Never put actual encryption keys or passwords into tracked files/command arguments/logs.
+
+The supplied `schema.sql` remains SQLite v2. The additive authentication extension
+v3 adds `Account` with a unique case-insensitive username, salted password hash,
+role, active flag, UTC creation time and unique patient/provider foreign-key links.
+CHECK constraints require exactly one Patient link for patient accounts, one
+Provider link for providers and neither for workers. Signup creates profile and
+patient account atomically; operators explicitly link preserved existing records.
+Accounts are never inferred from contact information. No migration creates default
+passwords, and no public form can select a privileged role.
+
+Runtime v4 adds `Patient.legacy_sex_encrypted`, `DermCase.encrypted_duration`,
+`Symptom.encrypted_answers` and the `EncryptionConfig` key-check marker, plus SQL
+guards rejecting plaintext clinical writes. Existing constrained duration/symptom
+columns remain NULL placeholders; encrypted envelopes preserve actual values and
+0/1/NULL distinctions. Optional `model_metadata` uses that same symptom envelope,
+requiring no further SQL migration. Submitted answers remain frozen.
+
+Use the [installation commands](#install-initialize-and-launch) for current v4
+setup. Copy migration accepts plaintext v2 or v3 directly: authentication is added
+only to the in-memory copy when needed. It refuses unknown schemas, invalid/missing
+images and existing destinations, verifies all shared image references, encrypts
+and checks round trips/foreign keys, VACUUMs in RAM to avoid stale plaintext pages,
+then atomically publishes the destination. Failure removes only its new staging
+artifacts. Original databases/uploads/backups remain unchanged and plaintext;
+securely archive or separately remove them after validating migration. Do not run
+the old plaintext application against them.
+
+For historical authentication-only maintenance, the explicit command below backs
+up an existing v2 database, adds Account and advances to v3 transactionally. It is
+not a replacement for encryption migration and v3 cannot serve the current app:
+
+```sh
+.venv/bin/python -m backend.db migrate-auth --database <legacy-database-path>
+```
+
+Repeating authentication migration on v3/v4 is a no-op; absent/unsupported databases
+are refused. Backups are SQLite-consistent, timestamped and private. There is no
+automatic destructive rollback: never restore an old backup over newer records.
+
+Supply exactly one `ENCRYPTION_KEY` or `ENCRYPTION_KEY_FILE`; when neither is
+specified, the app and launcher select the existing private local key file. They
+never create a replacement. Losing that key loses access to encrypted records.
+Back up the key separately from the encrypted database/uploads; use a distinct session
+secret. Wrong keys, corrupt tokens and field/storage-context mismatches fail
+closed without printing sensitive contents. SQL guards are an additional defense,
+not a substitute for application validation before encryption.
+
+Image adapters must call authorized `ImageStorage.read_original(storage_id,
+expected_hash)` rather than open an encrypted file as an image. It authenticates
+and decrypts to memory and checks the original plaintext SHA-256; no plaintext
+temporary image/cache is written. Camera metadata and exact source bytes survive
+where supplied. A startup-validated cipher is reused throughout that process,
+preventing a changed key file from silently mixing keys during a running server.
+
+Fernet authenticates individual values/files and their contexts, not the complete
+relational database: an attacker with database write access could replay a valid
+token within its field, modify unencrypted operational metadata or delete records.
+Key rotation tooling, OS swap protection, comprehensive audit, password recovery,
+MFA, throttling and durable server-side session revocation remain pending. Do not
+enable Flask debug or expose this local application publicly. HTTPS Secure cookies
+are configurable; local loopback HTTP deliberately leaves Secure off. See the
+[cryptography Fernet documentation](https://cryptography.io/en/stable/fernet/).
 
 ## Supplied local model in the clinician workflow
 
@@ -287,11 +398,10 @@ works even with incomplete model answers; unknown binary values block inference.
 Authorized source images are authenticated/decrypted in memory, processed using
 the saved contract, and their per-image probabilities are averaged. All 14 ranked
 groups remain unconfirmed, uncalibrated decision-support scores. Clinical priority
-stays **undetermined**; image quality is not automatically assessed. Complaints
+uses the separate [deterministic triage rules](#minimal-ai-assisted-triage); the neural network itself does not assign urgency. Image quality is not automatically assessed. Complaints
 and free-text notes are not embedded. AI never publishes diagnoses or treatments
 and is never requested automatically on submission. See
-[typed application bridge](docs/AI_INTEGRATION.md) and
-[saved-model contracts](docs/MODEL_INTERFACE.md).
+[inference interface and saved-model contracts](#inference-interface).
 
 ## SCIN multimodal model pipeline
 
@@ -311,4 +421,168 @@ bundle. This optional 41-output experiment is distinct from the supplied custom
 Keras model selected by the application. Each model needs its own complete saved
 metadata/class contract; inputs are not interchangeable merely because their
 encoded widths match. See
-[SCIN pipeline, commands and inference interface](docs/SCIN_PIPELINE.md).
+[inference interface](#inference-interface) and [verification record](implementation.md#verification-record).
+
+The cleaned export has 3,061 rows and 41 soft-label outputs. Seed 42 case-grouped
+splits are 2,142/459/460; one missing image_1 (case `-1834609919572055750`, source
+index 270, position 163) is explicitly excluded, giving usable 2,142/458/460.
+Images/metadata/Y share source positions; labels are never hardened or cleaned
+again. Original case+filename images come from the local Arrow cache or explicit
+image root; old numbered exports without a provenance manifest are not assumed
+aligned. Train-only categorical encoding yields 68 features; unknown categories
+produce zero category blocks, while missing binary answers raise. Images use
+EXIF orientation, RGB, aspect-preserving bilinear resize, centered black 224px
+padding and ImageNet normalization, preserving source bytes.
+
+MobileNetV3-Small features/global pooling feed 576→128; metadata uses input→64→32;
+fusion uses 160→128→41 logits. Dropout is 0.3 image/head and 0.2 metadata.
+Soft-label cross entropy/AdamW (weight decay 1e-4) keep Y distributions. Five frozen
+epochs use head LR 1e-3/other new layers 1e-4; fifteen fine-tuning epochs unfreeze
+blocks 10–12 at 1e-5 with new layers 1e-4. ReduceLROnPlateau uses factor 0.5,
+patience 2; early stopping uses validation loss/patience 5 and restores best weights.
+CLI flags include `--artifact`, `--image-root`, `--arrow-cache`, `--seed`,
+`--batch-size`, `--phase1-epochs`, `--phase2-epochs`, `--device`, `--num-workers`.
+Training auto-selects CUDA/MPS/CPU and may fetch official pretrained weights if
+uncached; inference never downloads them. Ctrl-C stops foreground training;
+completed checkpoints survive, but interrupted training does not auto-resume.
+
+Historical actual run `notebooks/scin_runs/run_20261011_mps` completed 20 epochs on
+MPS and selected epoch 20. Validation/test loss: **2.836584/2.854048**; top-1:
+**26.86%/23.04%**; top-3: **53.28%/54.78%**; macro-F1:
+**0.026275/0.024093**; expected soft-label top-3 mass: **0.492348/0.476619**.
+Low macro-F1 limits rare-condition interpretation; these are not clinical results.
+Accuracy uses the maximum-weight class only as a reporting reference. Full
+per-class support/precision/recall/F1 and confusion matrices, manifests, encoder,
+class mapping, training config/history and best checkpoint remain beside the run.
+The `app_model/` bundle includes hashes; restricted `weights_only=True` loading
+binds the encoder contract. `SCINPredictor(bundle).predict(image, metadata,
+top_k=3)` accepts bytes/PIL/path/file-like input and complete saved SCIN fields.
+CPU bundle loading/repeatable 41-score prediction passed in the earlier run.
+
+`scin_ml/` is retained: both `SCIN_MODEL.IPYNB` and `v2SCIN_MODEL.IPYNB` have
+executed import cells, `backend/ai/model_interface.py` uses its MobileNet class,
+and pipeline/interface tests import it. It is not an unused folder.
+
+## Inference interface
+
+The app uses `backend/ai/local_adapter.py:SCINModelAdapter` behind the typed
+`backend/ai/adapter.py:Adapter` protocol. Model architecture and tensor handling
+stay inside adapters; inference code never authorizes an HTTP request itself.
+The standalone model-agnostic entry points are:
+
+```python
+from backend.ai.model_interface import load_model, predict_case
+
+loaded = load_model("notebooks/SCIN_custom_model.keras")
+result = predict_case(images=authorized_image_bytes, symptoms=saved_symptoms,
+                      metadata=complete_saved_model_metadata)
+```
+
+Use actual authorized bytes from `ImageStorage.read_original(reference, sha256)`,
+or standalone local paths/PIL images. A single image or sequence is accepted.
+The current Flask bridge requires SCIN companion JSON and complete SCIN inputs;
+the broader standalone loader supports other declared contracts. A filename
+alone cannot reconstruct arbitrary architecture or missing training preprocessing.
+
+Supported artifacts: SCIN MobileNet `.pt`/`.pth` checkpoints or `app_model/`, the
+custom `.keras` with adjacent encoder/classes, TorchScript detected by archive
+contents, and strict tensor state dictionaries/checkpoint dictionaries
+(`model_state_dict`, `state_dict`, tensor-only `model`). Uniform `module.` prefixes
+are removed. Torch uses CUDA if available, otherwise CPU, `eval()` and
+`inference_mode()`; Keras uses `training=False`. This interface does not select
+Apple MPS automatically. Loading is lazy and a failed replacement preserves the
+previous model. Retain the returned `LoadedModel` for an independent instance;
+predictions are serialized per instance.
+
+Only load trusted local artifacts. PyTorch never retries restricted loading with
+`weights_only=False`; Keras has no unsafe Lambda/custom-object or `.h5` fallback.
+JSON preprocessing is preferred. Optional pickle needs explicit administrator
+`trust_pickle=True` and may execute code; compressed joblib is unsupported.
+Bundle/encoder hashes detect mismatch, not malicious tampering or retrospective
+training provenance absent from the original export.
+
+Saved checkpoint config can be supplemented by `<model filename>.json` (preferred)
+or adjacent `inference_config.json`, or TorchScript's embedded `inference.json`.
+Declare `architecture`, `model_kwargs`, `model_version`, exact `target_classes`,
+`inputs` (`image`/`image_metadata`/`dict`), `image`, `metadata`, `output` and `multi_image`.
+Sidecars cannot contradict saved dimensions/class order/image transforms. Example
+image contract: `{"size":224,"resize":"pad","scale":255,
+"mean":[0.485,0.456,0.406],"std":[0.229,0.224,0.225]}`.
+Size also accepts [height,width]; resize supports `pad`, `pillow_pad` or `stretch`.
+SCIN Keras uses its saved resolution, `/255` and exact Pillow centering; do not
+substitute ImageNet statistics for its saved contract.
+
+Metadata uses a saved encoder or ordered `features` descriptors with `name`,
+`kind` (numeric/binary/categorical), numeric `mean`/`std`/`default`, categorical
+`categories` and optional `aliases`. Ordering is artifact-defined, never request
+key order. Numeric normalization is (value−mean)/std. Generic missing defaults or
+unknown categories emit warnings; strict SCIN unknown binary inputs raise.
+Conflicting fields and nonfinite values fail. Encoder paths stay within the bundle.
+Free-text symptoms are context only, not embedded by these models.
+
+Multiple images default to `mean_probabilities`; MobileNet also supports
+`mean_embeddings`, and `stack` requires a matching model-specific contract.
+Aggregation is not independently validated training on multiple images.
+Output types are `softmax_logits`, `sigmoid_logits`, `probabilities` (no second
+activation), `weighted_scores` (normalized nonnegative scores), or `auto` with
+disclosed fallback/ambiguity; `output.multi_label` selects sigmoid logit fallback.
+Arbitrary logits cannot reveal the training objective. Dictionary/tuple outputs
+select `output.key`/`output.index`. Invalid shapes, NaN/infinity and out-of-range
+declared probabilities fail; missing class mapping/settings expose warnings and
+`class_N`/224px-ImageNet fallbacks rather than invented diagnosis names.
+Results are JSON-compatible: `top_prediction`, ranked `differential`,
+`triage_flags`, `model_version`, `output_format`, `warnings`, `probability_notice`.
+Errors are `ModelNotLoadedError`, `ModelLoadError` or `PredictionError`.
+Future raw-checkpoint architectures implement `TorchAdapter.build_model(config)`
+and register with `register_adapter`; no executable import strings come from JSON.
+
+### Typed app adapter and attempt lifecycle
+
+`Adapter.analyze_case(input: AnalysisInput) -> AnalysisOutput` receives immutable
+server-built dataclasses. `AnalysisInput` fields are `contract_version`, `case_id`,
+`complaint`, `duration_days`, `age`, `sex`, `symptoms`, `lesions`, `submitted_at`,
+and optional `model_metadata`. Lesions contain `lesion_id`, `body_site` and images;
+images contain `image_id`, `storage_reference`, `sha256`, `mime_type`, `quality`.
+References are server-generated private identifiers, never client paths/URLs;
+snapshots contain no image binaries or names/contact/DOB. Preserve NULL answers.
+The local model's complete v1.1 metadata snapshot supplements backward-compatible
+v1.0 callers without rewriting submitted records.
+
+`AnalysisOutput` contains `model_name`, `model_version`, `prompt_version`,
+`triage_level`, `summary`, `rationale`, `limitations`, ordered `candidates`,
+`image_quality` and optional `assisted_triage`. `Candidate` fields are
+`diagnosis_name`, consecutive `rank`, nullable `confidence` and optional
+`rationale`. Confidence must be finite in [0,1], not presented as clinically
+validated probability; nonprompted models use `prompt_version='not-applicable'`.
+Image-quality IDs must belong to the request and use unassessed/acceptable/poor.
+Assisted triage returns level/reasons/manual-review/method consistent with the
+SQL red/amber/green/undetermined priority described above.
+
+To replace the app adapter, create an implementation of this protocol and inject
+an instance into `app.config['AI_ADAPTER']` after `create_app({'MODEL_PATH':''})`.
+Pass it `ImageStorage(app.config, app.extensions['cipher'])`; inference workers
+have no Flask request context. Keep heavy imports lazy, inputs immutable and
+source hashes exact; never log clinical inputs or train from submission consent.
+
+`runner.run_analysis` authorizes, prepares/validates all inputs, then commits an
+encrypted snapshot and pending/running attempt. It invokes outside SQLite
+transactions and atomically validates/stores completed output/candidates/quality.
+Exceptions/timeout/invalid output produce sanitized failed attempts, preserving
+old successes. `analysis_base` prevents stale duplicate requests; intentional
+retries create new attempts. Unconfigured explicit requests return 503 without
+creating attempts. Startup marks interrupted attempts failed for explicit retry.
+Use one non-debug process: the bounded thread cannot be forcibly killed, retains
+its slot until exit, and discards late results after timeout. Restart recovers a
+permanently stuck worker; this is not a distributed job system.
+
+The standalone `triage_flags` helper retains its explicit melanoma/SCC, spreading,
+fever+infection and immunocompromised review notices; it does not set case priority.
+The Flask bridge instead uses the limited `triage_case` policy documented above.
+General emergency guidance and the independent `backend/safety.py` protocol remain
+separate; full immediate screening is pending. `tests/fixtures.py:FixtureAdapter`
+is developer-only, visibly simulated and never selected by default.
+
+Optional inference/pipeline checks use `PYTHONPATH=tests .venv/bin/python -m unittest
+test_model_interface test_scin_pipeline -v` with requirements-ml.txt and the Keras
+runtime installed. These synthetic checks do not train a model or validate it
+clinically. Earlier results are in [verification record](implementation.md#verification-record).

@@ -129,7 +129,7 @@ def initialize(path, encryption):
                 raise RuntimeError('The selected DATABASE is plaintext runtime v3. If already migrated, set '
                                    'DATABASE=instance/encrypted/demo.sqlite3 and UPLOAD_DIR=instance/encrypted/uploads. '
                                    'Otherwise stop the server and run the explicit copy migration: '
-                                   'python -m backend.migrate_encryption (see docs/ENCRYPTION.md). No data was modified.')
+                                   'python -m backend.migrate_encryption (see README.md#encryption-and-migrations). No data was modified.')
             if version == 2:
                 raise RuntimeError(f'{path}: authentication requires user_version 3; found 2. Stop the server, then run '
                                    f'.venv/bin/python -m backend.db migrate-auth --database "{path}". A backup is created first.')
